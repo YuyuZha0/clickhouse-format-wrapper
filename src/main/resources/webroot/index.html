@@ -63,7 +63,7 @@
             <textarea id="sqlInput" style="width: 100%" placeholder="Paste your SQL here"></textarea>
         </div>
         <div class="col-md-6">
-            <pre id="sqlOutput" class="border" style="width: 100%"></pre>
+            <div id="sqlOutput" class="border" style="width: 100%"></div>
             <div class="input-group">
                 <button class="btn btn-outline-secondary" type="button" id="copyBtn"
                         data-clipboard-target="#sqlOutput">Copy
@@ -82,6 +82,7 @@
         integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl"
         crossorigin="anonymous"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/clipboard.js/1.5.12/clipboard.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/ansi_up@5.1.0/ansi_up.min.js"></script>
 <script type="application/javascript">
     $.getScript('static/index.js');
 </script>
