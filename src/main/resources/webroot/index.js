@@ -58,7 +58,7 @@
                     return;
                 }
                 $.ajax({
-                    url: '/api/format?' + buildOptions(),
+                    url: 'api/format?' + buildOptions(),
                     method: 'POST',
                     data: sql,
                     dataType: 'text',
