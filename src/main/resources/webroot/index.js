@@ -69,7 +69,7 @@
                         $output.text(status + ': ' + error);
                     }
                 });
-            }, 1000);
+            }, 200);
         });
     });
 })(window.jQuery);
