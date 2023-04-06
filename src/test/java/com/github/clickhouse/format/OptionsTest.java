@@ -21,8 +21,8 @@ public class OptionsTest {
 
     multiMap.add("seed", "Hello World");
 
-    multiMap.add("allow_settings_after_format_in_insert", "false");
-    multiMap.add("max_parser_depth", "9999");
+    multiMap.add("allowSettingsAfterFormatInInsert", "false");
+    multiMap.add("maxParserDepth", "9999");
 
     Options options = Options.fromMultiMap(new ObjectMapper(), multiMap);
 
