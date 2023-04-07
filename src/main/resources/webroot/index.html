@@ -21,39 +21,48 @@
         <form class="form-inline col-md-12" id="mainForm">
             <div class="form-check ml-2">
                 <input type="checkbox" checked="checked" class="form-check-input" id="hiliteCheck">
-                <label class="form-check-label" for="hiliteCheck">hilite</label>
+                <label class="form-check-label" for="hiliteCheck" data-toggle="tooltip" data-placement="bottom"
+                       title="add syntax highlight with ANSI terminal escape sequences">hilite</label>
             </div>
             <div class="form-check ml-2">
                 <input type="checkbox" class="form-check-input" id="onelineCheck">
-                <label class="form-check-label" for="onelineCheck">oneline</label>
+                <label class="form-check-label" for="onelineCheck" data-toggle="tooltip" data-placement="bottom"
+                       title="format in single line">oneline</label>
             </div>
             <div class="form-check ml-2">
                 <input type="checkbox" class="form-check-input" id="multiqueryCheck">
-                <label class="form-check-label" for="multiqueryCheck">multiquery</label>
+                <label class="form-check-label" for="multiqueryCheck" data-toggle="tooltip" data-placement="bottom"
+                       title="allow multiple queries in the same file">multiquery</label>
             </div>
             <div class="form-check ml-2">
                 <input type="checkbox" class="form-check-input" id="backslashCheck">
-                <label class="form-check-label" for="backslashCheck">backslash</label>
+                <label class="form-check-label" for="backslashCheck" data-toggle="tooltip" data-placement="bottom"
+                       title="add a backslash at the end of each line of the formatted query">backslash</label>
             </div>
             <div class="form-check ml-2">
                 <input type="checkbox" class="form-check-input" id="allowSettingsAfterFormatInInsertCheck">
                 <label class="form-check-label"
-                       for="allowSettingsAfterFormatInInsertCheck">allowSettingsAfterFormatInInsert</label>
+                       for="allowSettingsAfterFormatInInsertCheck" data-toggle="tooltip" data-placement="bottom"
+                       title="Allow SETTINGS after FORMAT, but note, that this is not always safe">allowSettingsAfterFormatInInsert</label>
             </div>
             <div class="form-check ml-2">
                 <input type="checkbox" class="form-check-input" id="obfuscateCheck">
-                <label class="form-check-label" for="obfuscateCheck">obfuscate</label>
+                <label class="form-check-label" for="obfuscateCheck" data-toggle="tooltip" data-placement="bottom"
+                       title="obfuscate instead of formatting">obfuscate</label>
             </div>
             <div class="form-group ml-2">
-                <label for="seedInput">seed:</label>
+                <label for="seedInput" data-toggle="tooltip" data-placement="bottom"
+                       title="seed (arbitrary string) that determines the result of obfuscation">seed:</label>
                 <input type="text" class="form-control" id="seedInput">
             </div>
             <div class="form-group ml-2">
-                <label for="maxQuerySizeInput">maxQuerySize:</label>
+                <label for="maxQuerySizeInput" data-toggle="tooltip" data-placement="bottom"
+                       title="The maximum number of bytes of a query string parsed by the SQL parser. Data in the VALUES clause of INSERT queries is processed by a separate stream parser (that consumes O(1) RAM) and not affected by this restriction.">maxQuerySize:</label>
                 <input type="number" class="form-control" id="maxQuerySizeInput">
             </div>
             <div class="form-group ml-2">
-                <label for="maxParserDepthInput">maxParserDepth:</label>
+                <label for="maxParserDepthInput" data-toggle="tooltip" data-placement="bottom"
+                       title="Maximum parser depth (recursion depth of recursive descend parser).">maxParserDepth:</label>
                 <input type="number" class="form-control" id="maxParserDepthInput">
             </div>
             <div class="form-group ml-2">
@@ -84,6 +93,9 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/clipboard.js/1.5.12/clipboard.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/ansi_up@5.1.0/ansi_up.min.js"></script>
 <script type="application/javascript">
+    $(function () {
+        $('[data-toggle="tooltip"]').tooltip()
+    });
     $.getScript('static/index.js');
 </script>
 </body>

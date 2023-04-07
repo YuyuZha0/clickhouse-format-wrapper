@@ -68,7 +68,7 @@
                     }
                 },
                 error: function (xhr, status, error) {
-                    $output.html(`<p class="text-danger">${status}: ${xhr.responseText}</p>`);
+                    $output.html(`<p class="text-danger">${xhr.responseText}</p>`);
                 }
             });
         }

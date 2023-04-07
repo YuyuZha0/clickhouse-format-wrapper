@@ -42,7 +42,12 @@ public final class App extends AbstractVerticle {
   }
 
   public static void main(String[] args) {
-    Vertx vertx = Vertx.vertx(new VertxOptions().setPreferNativeTransport(true));
+    Vertx vertx =
+        Vertx.vertx(
+            new VertxOptions()
+                .setPreferNativeTransport(true)
+                .setWorkerPoolSize(
+                    Math.min(20, 2 * Runtime.getRuntime().availableProcessors() + 1)));
     Injector injector = Guice.createInjector(new AppModule());
     App app = injector.getInstance(App.class);
     vertx.deployVerticle(
@@ -66,11 +71,12 @@ public final class App extends AbstractVerticle {
   @Override
   public void start(Promise<Void> startPromise) throws Exception {
     Router router = Router.router(vertx);
-    BodyHandler bodyHandler = BodyHandler.create(false);
-    bodyHandler.setBodyLimit(3 * 1024 * 1024); // 3M
     router.get("/").handler(ctx -> ctx.reroute("/static/index.html"));
     router.route("/static/*").handler(StaticHandler.create("webroot").setCachingEnabled(true));
-    router.post("/api/format").handler(bodyHandler).handler(formattingHandler);
+    router
+        .post("/api/format")
+        .handler(BodyHandler.create(false).setBodyLimit(3 * 1024 * 1024))
+        .handler(formattingHandler);
     router
         .route("/health")
         .handler(
