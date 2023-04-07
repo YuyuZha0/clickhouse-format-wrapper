@@ -31,7 +31,7 @@ public class OptionsTest {
     assertEquals(Boolean.FALSE, options.getMultiquery());
     assertEquals(Boolean.FALSE, options.getAllowSettingsAfterFormatInInsert());
     assertEquals(Integer.valueOf(9999), options.getMaxParserDepth());
-    assertEquals("Hello World", options.getSeed());
+    assertEquals("HelloWorld", options.getSeed());
 
     assertNull(options.getBackslash());
     assertNull(options.getObfuscate());
@@ -45,7 +45,7 @@ public class OptionsTest {
     options.setOneline(true);
     options.setMultiquery(false);
 
-    options.setSeed("Hello World");
+    options.setSeed("HelloWorld");
     options.setMaxQuerySize(100);
 
     assertEquals(
