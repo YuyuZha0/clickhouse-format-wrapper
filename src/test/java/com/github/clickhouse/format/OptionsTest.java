@@ -50,7 +50,7 @@ public class OptionsTest {
 
     assertEquals(
         Arrays.asList(
-            "--hilite", "--oneline", "--seed", "'HelloWorld'", "--max_query_size", "100"),
+            "--hilite", "--oneline", "--seed", "HelloWorld", "--max_query_size", "100"),
         options.appendTo(new ArrayList<>()));
   }
 }
