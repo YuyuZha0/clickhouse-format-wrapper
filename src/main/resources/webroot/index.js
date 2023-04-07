@@ -67,7 +67,7 @@
                     }
                 },
                 error: function (xhr, status, error) {
-                    $output.html(`<p class="text-danger">${status}: ${xhr.responseText}</p>`);
+                    $output.html(`<p class="text-danger">${status}: ${error}</p>`);
                 }
             });
         }
@@ -79,7 +79,7 @@
             }
             timer = setTimeout(formatRequest, 200);
         });
-        $('#mainForm > input[type="check"]').on('change', formatRequest);
+        $('#mainForm > input[type="checkbox"]').on('change', formatRequest);
         new Clipboard('#copyBtn');
     });
 })(window.jQuery);
