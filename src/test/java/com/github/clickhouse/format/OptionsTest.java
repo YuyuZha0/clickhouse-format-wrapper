@@ -19,7 +19,7 @@ public class OptionsTest {
     multiMap.add("oneline", "true");
     multiMap.add("multiquery", "false");
 
-    multiMap.add("seed", "Hello World");
+    multiMap.add("seed", "HelloWorld");
 
     multiMap.add("allowSettingsAfterFormatInInsert", "false");
     multiMap.add("maxParserDepth", "9999");
@@ -50,7 +50,7 @@ public class OptionsTest {
 
     assertEquals(
         Arrays.asList(
-            "--hilite", "--oneline", "--seed", "'Hello World'", "--max_query_size", "100"),
+            "--hilite", "--oneline", "--seed", "'HelloWorld'", "--max_query_size", "100"),
         options.appendTo(new ArrayList<>()));
   }
 }
