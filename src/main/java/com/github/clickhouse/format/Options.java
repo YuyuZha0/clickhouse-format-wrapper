@@ -108,9 +108,9 @@ public final class Options implements Serializable {
       String s = (String) value;
       // avoid command line injection
       if (ALLOWED_STRING_PATTERN.matcher(s).matches()) {
-        return "'" + s + "'";
+        return s;
       }
-      return "''";
+      return "";
     }
     return value.toString();
   }
