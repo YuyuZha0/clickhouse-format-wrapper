@@ -12,7 +12,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -68,7 +67,7 @@ public final class CommandLineSqlFormatter {
       throws SqlFormatException, IOException, InterruptedException {
     ProcessBuilder processBuilder = new ProcessBuilder();
     processBuilder.command(buildCommand(options));
-    processBuilder.redirectErrorStream(true);
+    processBuilder.redirectErrorStream(false);
 
     Process process = processBuilder.start();
     ScheduledFuture<?> timeoutFuture = registerTimeout(process);
