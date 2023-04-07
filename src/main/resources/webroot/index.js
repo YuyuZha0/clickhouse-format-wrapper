@@ -55,6 +55,7 @@
             $.ajax({
                 url: 'api/format?' + $.param(options),
                 method: 'POST',
+                contentType: "text/plain; charset=utf-8",
                 data: sql,
                 dataType: 'text',
                 success: function (data) {
@@ -67,7 +68,7 @@
                     }
                 },
                 error: function (xhr, status, error) {
-                    $output.html(`<p class="text-danger">${status}: ${error}</p>`);
+                    $output.html(`<p class="text-danger">${status}: ${xhr.statusText}</p>`);
                 }
             });
         }
@@ -79,7 +80,7 @@
             }
             timer = setTimeout(formatRequest, 200);
         });
-        $('#mainForm > input[type="checkbox"]').on('change', formatRequest);
+        $('#mainForm input[type="checkbox"]').on('change', formatRequest);
         new Clipboard('#copyBtn');
     });
 })(window.jQuery);
