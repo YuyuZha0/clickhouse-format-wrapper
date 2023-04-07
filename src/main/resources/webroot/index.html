@@ -10,7 +10,7 @@
           integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
     <style>
         body {
-            font-family: "Courier New", "Arial", "Helvetica", sans-serif;
+            font-family: "Source Code Pro", "Menlo", "Monaco", "Consolas", "Courier New", "Arial", "Helvetica", sans-serif;
         }
     </style>
 </head>
@@ -18,9 +18,9 @@
 <div class="container-fluid">
     <h1>Online Clickhouse SQL Formatter</h1>
     <div class="row py-1">
-        <form class="form-inline col-md-12">
+        <form class="form-inline col-md-12" id="mainForm">
             <div class="form-check ml-2">
-                <input type="checkbox" class="form-check-input" id="hiliteCheck">
+                <input type="checkbox" checked="checked" class="form-check-input" id="hiliteCheck">
                 <label class="form-check-label" for="hiliteCheck">hilite</label>
             </div>
             <div class="form-check ml-2">
@@ -50,11 +50,16 @@
             </div>
             <div class="form-group ml-2">
                 <label for="maxQuerySizeInput">maxQuerySize:</label>
-                <input type="text" class="form-control" id="maxQuerySizeInput">
+                <input type="number" class="form-control" id="maxQuerySizeInput">
             </div>
             <div class="form-group ml-2">
                 <label for="maxParserDepthInput">maxParserDepth:</label>
-                <input type="text" class="form-control" id="maxParserDepthInput">
+                <input type="number" class="form-control" id="maxParserDepthInput">
+            </div>
+            <div class="input-group">
+                <button class="btn btn-outline-secondary" type="button" id="copyBtn"
+                        data-clipboard-target="#sqlOutput">Copy
+                </button>
             </div>
         </form>
     </div>
@@ -63,12 +68,7 @@
             <textarea id="sqlInput" style="width: 100%" placeholder="Paste your SQL here"></textarea>
         </div>
         <div class="col-md-6">
-            <div id="sqlOutput" class="border" style="width: 100%"></div>
-            <div class="input-group">
-                <button class="btn btn-outline-secondary" type="button" id="copyBtn"
-                        data-clipboard-target="#sqlOutput">Copy
-                </button>
-            </div>
+            <div id="sqlOutput" class="border" style="width: 100%; white-space: pre-wrap"></div>
         </div>
     </div>
 

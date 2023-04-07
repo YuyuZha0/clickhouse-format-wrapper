@@ -1,30 +1,29 @@
 (function ($) {
 
+    const $input = $('#sqlInput');
+    const $output = $('#sqlOutput');
+
+    const resetHeight = function () {
+        const height = Math.round($(window).height() * 0.75) + 'px'
+        $input.css('height', height);
+        $output.css('height', height);
+    };
+
+    resetHeight();
+    $(window).on('resize', resetHeight);
+
+    const $hilite = $('#hiliteCheck');
+    const $oneline = $('#onelineCheck');
+    const $multiquery = $('#multiqueryCheck');
+    const $backslash = $('#backslashCheck');
+    const $allowSettingsAfterFormatInInsert = $('#allowSettingsAfterFormatInInsertCheck');
+    const $obfuscate = $('#obfuscateCheck');
+
+    const $seed = $('#seedInput');
+    const $maxQuerySize = $('#maxQuerySizeInput');
+    const $maxParserDepth = $('#maxParserDepthInput');
+
     $(document).ready(function () {
-
-        const $input = $('#sqlInput');
-        const $output = $('#sqlOutput');
-
-        const resetHeight = function () {
-            const height = Math.round($(window).height() * 0.75) + 'px'
-            $input.css('height', height);
-            $output.css('height', height);
-        };
-
-        resetHeight();
-        $(window).on('resize', resetHeight);
-
-        const $hilite = $('#hiliteCheck');
-        const $oneline = $('#onelineCheck');
-        const $multiquery = $('#multiqueryCheck');
-        const $backslash = $('#backslashCheck');
-        const $allowSettingsAfterFormatInInsert = $('#allowSettingsAfterFormatInInsertCheck');
-        const $obfuscate = $('#obfuscateCheck');
-
-        const $seed = $('#seedInput');
-        const $maxQuerySize = $('#maxQuerySizeInput');
-        const $maxParserDepth = $('#maxParserDepthInput');
-
         const getOptions = function () {
             const obj = {
                 hilite: $hilite.prop('checked'),
@@ -63,7 +62,7 @@
                         if (options.hilite) {
                             $output.html(ansiUp.ansi_to_html(data));
                         } else {
-                            $output.html(`<pre><code>${data}</code></pre>`);
+                            $output.html(`<code>${data}</code>`);
                         }
                     }
                 },
@@ -80,6 +79,7 @@
             }
             timer = setTimeout(formatRequest, 200);
         });
+        $('#mainForm > input[type="check"]').on('change', formatRequest);
         new Clipboard('#copyBtn');
     });
 })(window.jQuery);

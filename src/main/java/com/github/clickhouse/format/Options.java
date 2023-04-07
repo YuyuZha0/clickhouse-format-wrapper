@@ -17,6 +17,7 @@ import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 // Allowed options:
@@ -44,6 +45,8 @@ import java.util.stream.Collectors;
 @Setter
 @JsonIgnoreProperties(ignoreUnknown = true)
 public final class Options implements Serializable {
+
+  private static final Pattern ALLOWED_STRING_PATTERN = Pattern.compile("^[a-zA-Z0-9_\\-]+$");
 
   private static final Map<String, Field> CACHED_FIELDS;
   private static final long serialVersionUID = -1793995872382083833L;
@@ -103,11 +106,11 @@ public final class Options implements Serializable {
   private static String wrap(Object value) {
     if (value instanceof String) {
       String s = (String) value;
-      if (s.indexOf('\'') >= 0) {
-        return "\"" + s + "\"";
-      } else {
+      // avoid command line injection
+      if (ALLOWED_STRING_PATTERN.matcher(s).matches()) {
         return "'" + s + "'";
       }
+      return "''";
     }
     return value.toString();
   }
