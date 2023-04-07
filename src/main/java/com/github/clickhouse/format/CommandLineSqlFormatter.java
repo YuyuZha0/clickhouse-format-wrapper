@@ -57,8 +57,10 @@ public final class CommandLineSqlFormatter {
       processBuilder.redirectErrorStream(false);
       Process process = processBuilder.start();
       int code = process.waitFor();
+      System.out.println(code);
       return code == 0;
     } catch (Exception e) {
+      e.printStackTrace();
       return false;
     }
   }
