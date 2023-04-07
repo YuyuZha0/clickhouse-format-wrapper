@@ -53,14 +53,12 @@ public final class CommandLineSqlFormatter {
   public static boolean isCommandAvailable() {
     try {
       ProcessBuilder processBuilder = new ProcessBuilder();
-      processBuilder.command(BIN_NAME, "--help");
+      processBuilder.command(BIN_NAME, "--query='select 1'");
       processBuilder.redirectErrorStream(false);
       Process process = processBuilder.start();
       int code = process.waitFor();
-      System.out.println(code);
       return code == 0;
     } catch (Exception e) {
-      e.printStackTrace();
       return false;
     }
   }
