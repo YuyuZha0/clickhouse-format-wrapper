@@ -36,8 +36,8 @@ public final class FormattingHandler implements Handler<RoutingContext> {
     response
         .putHeader(HttpHeaderNames.CONTENT_TYPE, TEXT_PLAIN)
         .setStatusCode(status.code())
-        .setStatusMessage(msg)
-        .end();
+        .setStatusMessage(status.reasonPhrase())
+        .end(msg);
   }
 
   @Override
