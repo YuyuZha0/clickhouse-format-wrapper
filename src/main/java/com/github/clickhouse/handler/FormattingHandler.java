@@ -77,8 +77,10 @@ public final class FormattingHandler implements Handler<RoutingContext> {
               } else {
                 Throwable cause = result.cause();
                 if (cause instanceof SqlFormatException) {
-                  endWithCodeAndMsg(
-                      response, HttpResponseStatus.NOT_ACCEPTABLE, cause.getMessage());
+                  response
+                      .setStatusCode(HttpResponseStatus.NOT_ACCEPTABLE.code())
+                      .putHeader(HttpHeaderNames.CONTENT_TYPE, TEXT_PLAIN)
+                      .end(((SqlFormatException) cause).getStderr());
                 } else {
                   endWithCodeAndMsg(
                       response, HttpResponseStatus.INTERNAL_SERVER_ERROR, cause.getMessage());

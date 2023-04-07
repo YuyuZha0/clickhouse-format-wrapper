@@ -27,6 +27,7 @@ public final class CommandLineSqlFormatter {
               .setNameFormat("clickhouse-format-watch-dog-%d")
               .setDaemon(true)
               .build());
+  private static final String BIN_NAME = "clickhouse-format";
 
   private final Semaphore semaphore = new Semaphore(10);
 
@@ -49,15 +50,24 @@ public final class CommandLineSqlFormatter {
         TimeUnit.SECONDS);
   }
 
-  public Buffer format(@NonNull Buffer input, @NonNull Options options) throws SqlFormatException {
+  public static boolean isCommandAvailable() {
+    try {
+      ProcessBuilder processBuilder = new ProcessBuilder();
+      processBuilder.command(BIN_NAME, "--help");
+      processBuilder.redirectErrorStream(false);
+      Process process = processBuilder.start();
+      int code = process.waitFor();
+      return code == 0;
+    } catch (Exception e) {
+      return false;
+    }
+  }
+
+  public Buffer format(@NonNull Buffer input, @NonNull Options options) throws Exception {
 
     try {
       semaphore.acquire();
       return format0(input, options);
-    } catch (SqlFormatException e) {
-      throw e;
-    } catch (Exception e1) {
-      throw new RuntimeException(e1);
     } finally {
       semaphore.release();
     }
@@ -80,7 +90,7 @@ public final class CommandLineSqlFormatter {
     }
     if (code != 0) {
       try (InputStream inputStream = process.getErrorStream()) {
-        throw new SqlFormatException(code, inputStreamToBuffer(inputStream).toString());
+        throw new SqlFormatException(code, inputStreamToBuffer(inputStream));
       }
     }
     try (InputStream inputStream = process.getInputStream()) {
@@ -89,10 +99,8 @@ public final class CommandLineSqlFormatter {
   }
 
   private List<String> buildCommand(Options options) {
-    // System.out.println(options.appendTo(new ArrayList<>()));
-    // return Arrays.asList("tee");
     List<String> command = new ArrayList<>();
-    command.add("clickhouse-format");
+    command.add(BIN_NAME);
     options.appendTo(command);
     command.add("<");
     return command;

@@ -1,5 +1,6 @@
 package com.github.clickhouse;
 
+import com.github.clickhouse.format.CommandLineSqlFormatter;
 import com.github.clickhouse.handler.FormattingHandler;
 import com.google.inject.Guice;
 import com.google.inject.Inject;
@@ -42,6 +43,12 @@ public final class App extends AbstractVerticle {
   }
 
   public static void main(String[] args) {
+    if (CommandLineSqlFormatter.isCommandAvailable()) {
+      log.info("clickhouse-format is available");
+    } else {
+      log.error("clickhouse-format is not available");
+      System.exit(1);
+    }
     Vertx vertx =
         Vertx.vertx(
             new VertxOptions()
