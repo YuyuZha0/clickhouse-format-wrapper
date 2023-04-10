@@ -8,6 +8,7 @@ import io.vertx.core.buffer.Buffer;
 import io.vertx.core.buffer.impl.VertxByteBufAllocator;
 import lombok.NonNull;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -27,9 +28,25 @@ public final class CommandLineSqlFormatter {
               .setNameFormat("clickhouse-format-watch-dog-%d")
               .setDaemon(true)
               .build());
+  private static final File CLICKHOUSE_HOME;
   private static final String BIN_NAME = "clickhouse-format";
+  private static final int MAX_CONCURRENT_FORMATTING = 10;
 
-  private final Semaphore semaphore = new Semaphore(10);
+  static {
+    String clickhouseHome = System.getenv("CLICKHOUSE_HOME");
+    if (clickhouseHome != null && !clickhouseHome.isEmpty()) {
+      File clickhouseHomeFile = new File(clickhouseHome);
+      if (clickhouseHomeFile.exists() && clickhouseHomeFile.isDirectory()) {
+        CLICKHOUSE_HOME = clickhouseHomeFile;
+      } else {
+        CLICKHOUSE_HOME = null;
+      }
+    } else {
+      CLICKHOUSE_HOME = null;
+    }
+  }
+
+  private final Semaphore semaphore = new Semaphore(MAX_CONCURRENT_FORMATTING);
 
   private static Buffer inputStreamToBuffer(InputStream inputStream) throws IOException {
     ByteBuf byteBuf = VertxByteBufAllocator.DEFAULT.heapBuffer();
@@ -37,6 +54,12 @@ public final class CommandLineSqlFormatter {
       ByteStreams.copy(inputStream, outputStream);
     }
     return Buffer.buffer(byteBuf);
+  }
+
+  private static void setClickhouseHome(ProcessBuilder processBuilder) {
+    if (CLICKHOUSE_HOME != null) {
+      processBuilder.directory(CLICKHOUSE_HOME);
+    }
   }
 
   private static ScheduledFuture<?> registerTimeout(Process process) {
@@ -55,6 +78,7 @@ public final class CommandLineSqlFormatter {
       ProcessBuilder processBuilder = new ProcessBuilder();
       processBuilder.command(BIN_NAME, "--query", "select 1");
       processBuilder.redirectErrorStream(false);
+      setClickhouseHome(processBuilder);
       Process process = processBuilder.start();
       int code = process.waitFor();
       return code == 0;
@@ -78,6 +102,7 @@ public final class CommandLineSqlFormatter {
     ProcessBuilder processBuilder = new ProcessBuilder();
     processBuilder.command(buildCommand(options));
     processBuilder.redirectErrorStream(false);
+    setClickhouseHome(processBuilder);
 
     Process process = processBuilder.start();
     ScheduledFuture<?> timeoutFuture = registerTimeout(process);

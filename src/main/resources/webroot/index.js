@@ -44,7 +44,19 @@
             return obj;
         };
 
-        const ansiUp = new AnsiUp();
+        const createHighlighter = function () {
+            if (window.AnsiUp) {
+                const ansiUp = new AnsiUp();
+                return ansiUp.ansi_to_html;
+            } else {
+                console.warn('AnsiUp not available!');
+                return function (text) {
+                    return text;
+                }
+            }
+        };
+
+        const highlighter = createHighlighter();
         const formatRequest = function () {
             const sql = $input.val();
             if (/^\s*$/.test(sql)) {
@@ -61,7 +73,7 @@
                 success: function (data) {
                     if (typeof data === 'string' || data instanceof String) {
                         if (options.hilite) {
-                            $output.html(ansiUp.ansi_to_html(data));
+                            $output.html(highlighter(data));
                         } else {
                             $output.html(`<code>${data}</code>`);
                         }
@@ -81,6 +93,15 @@
             timer = setTimeout(formatRequest, 200);
         });
         $('#mainForm input[type="checkbox"]').on('change', formatRequest);
-        new Clipboard('#copyBtn');
+
+        const initClipboard = function () {
+            if (window.Clipboard) {
+                new Clipboard('#copyBtn');
+            } else {
+                console.warn('Clipboard not available!');
+            }
+        };
+        initClipboard();
+
     });
 })(window.jQuery);
