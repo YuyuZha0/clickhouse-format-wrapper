@@ -7,6 +7,7 @@ import io.netty.buffer.ByteBufOutputStream;
 import io.vertx.core.buffer.Buffer;
 import io.vertx.core.buffer.impl.VertxByteBufAllocator;
 import lombok.NonNull;
+import lombok.extern.slf4j.Slf4j;
 
 import java.io.File;
 import java.io.IOException;
@@ -20,6 +21,7 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 
+@Slf4j
 public final class CommandLineSqlFormatter {
 
   private static final ScheduledExecutorService WATCH_DOG =
@@ -38,6 +40,7 @@ public final class CommandLineSqlFormatter {
       File clickhouseHomeFile = new File(clickhouseHome);
       if (clickhouseHomeFile.exists() && clickhouseHomeFile.isDirectory()) {
         CLICKHOUSE_HOME = clickhouseHomeFile;
+        log.info("CLICLHOUSE_HOME is set to \"{}\".", clickhouseHome);
       } else {
         CLICKHOUSE_HOME = null;
       }

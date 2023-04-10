@@ -47,12 +47,14 @@
         const createHighlighter = function () {
             if (window.AnsiUp) {
                 const ansiUp = new AnsiUp();
-                return ansiUp.ansi_to_html;
+                return function (text) {
+                    return ansiUp.ansi_to_html(text);
+                };
             } else {
                 console.warn('AnsiUp not available!');
                 return function (text) {
                     return text;
-                }
+                };
             }
         };
 
