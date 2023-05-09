@@ -25,6 +25,7 @@
     const $progressBar = $('#progressBar');
 
     const updateProgressBar = function (rate) {
+        console.log(rate);
         const nPercent = Math.min(Math.round(rate * 100), 100);
         $progressBar.css('width', `{nPercent}%`);
         $progressBar.attr('aria-valuenow', nPercent);
