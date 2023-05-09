@@ -22,6 +22,22 @@
     const $seed = $('#seedInput');
     const $maxQuerySize = $('#maxQuerySizeInput');
     const $maxParserDepth = $('#maxParserDepthInput');
+    const $progressBar = $('#progressBar');
+
+    const updateProgressBar = function (rate) {
+        const nPercent = Math.min(Math.round(rate * 100), 100);
+        $progressBar.css('width', `{nPercent}%`);
+        $progressBar.attr('aria-valuenow', nPercent);
+    };
+    const initProgressBar = function () {
+        $progressBar.addClass('progress-bar-striped');
+        updateProgressBar(0);
+    };
+    const completeProgressBar = function () {
+        $progressBar.removeClass('progress-bar-striped');
+        updateProgressBar(1);
+    };
+
 
     $(document).ready(function () {
         const getOptions = function () {
@@ -58,6 +74,30 @@
             }
         };
 
+        const xhrFactory = function () {
+            const xhr = new window.XMLHttpRequest();
+            // Upload progress
+            xhr.upload.addEventListener("progress", function (evt) {
+                if (evt.lengthComputable) {
+                    const percentComplete = evt.loaded / evt.total;
+                    updateProgressBar(percentComplete / 2);
+                } else {
+                    updateProgressBar(0.4);
+                }
+            }, false);
+            // Download progress
+            xhr.addEventListener("progress", function (evt) {
+                if (evt.lengthComputable) {
+                    const percentComplete = evt.loaded / evt.total;
+                    updateProgressBar(0.5 + percentComplete / 2);
+                } else {
+                    updateProgressBar(0.9);
+                }
+            }, false);
+
+            return xhr;
+        };
+
         const highlighter = createHighlighter();
         const formatRequest = function () {
             const sql = $input.val();
@@ -65,25 +105,27 @@
                 return;
             }
             $output.empty();
+            initProgressBar();
             const options = getOptions();
             $.ajax({
+                xhr: xhrFactory,
                 url: 'api/format?' + $.param(options),
                 method: 'POST',
                 contentType: "text/plain; charset=utf-8",
                 data: sql,
-                dataType: 'text',
-                success: function (data) {
-                    if (typeof data === 'string' || data instanceof String) {
-                        if (options.hilite) {
-                            $output.html(highlighter(data));
-                        } else {
-                            $output.html(`<code>${data}</code>`);
-                        }
+                dataType: 'text'
+            }).done(function (data) {
+                if (typeof data === 'string' || data instanceof String) {
+                    if (options.hilite) {
+                        $output.html(highlighter(data));
+                    } else {
+                        $output.html(`<code>${data}</code>`);
                     }
-                },
-                error: function (xhr, status, error) {
-                    $output.html(`<p class="text-danger">${xhr.responseText}</p>`);
                 }
+            }).fail(function (xhr, status, error) {
+                $output.html(`<p class="text-danger">${xhr.responseText}</p>`);
+            }).always(function () {
+                completeProgressBar();
             });
         }
 
