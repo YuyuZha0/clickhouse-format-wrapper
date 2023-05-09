@@ -25,7 +25,6 @@
     const $progressBar = $('#progressBar');
 
     const updateProgressBar = function (rate) {
-        console.log(rate);
         const nPercent = Math.min(Math.round(rate * 100), 100);
         $progressBar.css('width', `{nPercent}%`);
         $progressBar.attr('aria-valuenow', nPercent);
@@ -76,16 +75,16 @@
         };
 
         const xhrFactory = function () {
-            const xhr = new window.XMLHttpRequest();
+            const xhr = $.ajaxSettings.xhr();
             // Upload progress
-            xhr.upload.addEventListener("progress", function (evt) {
+            xhr.upload.onprogress = function (evt) {
                 if (evt.lengthComputable) {
                     const percentComplete = evt.loaded / evt.total;
                     updateProgressBar(percentComplete / 2);
                 } else {
                     updateProgressBar(0.4);
                 }
-            }, false);
+            };
             // Download progress
             xhr.addEventListener("progress", function (evt) {
                 if (evt.lengthComputable) {
