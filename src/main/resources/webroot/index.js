@@ -39,14 +39,14 @@
     };
     const xhrFactory = function () {
         const xhr = new window.XMLHttpRequest();
-        xhr.upload.addEventListener("progress", function (evt) {
+        xhr.upload.onprogress = function (evt) {
             if (evt.lengthComputable) {
                 const percentComplete = evt.loaded / evt.total;
                 updateProgressBar(percentComplete / 2);
             } else {
                 updateProgressBar(0.4);
             }
-        }, false);
+        };
 
         xhr.addEventListener("progress", function (evt) {
             if (evt.lengthComputable) {
