@@ -29,12 +29,22 @@
         $progressBar.css('width', `{nPercent}%`);
         $progressBar.attr('aria-valuenow', nPercent);
     };
+    let progressTimer = null;
     const initProgressBar = function () {
-        $progressBar.addClass('progress-bar-striped');
-        updateProgressBar(0);
+        $progressBar.addClass('progress-bar-striped', 'progress-bar-animated');
+        updateProgressBar(0.5);
+        let count = 0;
+        progressTimer = setInterval(function () {
+            count++;
+            updateProgressBar(0.5 + 0.5 * Math.sin(count / 10));
+        }, 30);
     };
     const completeProgressBar = function () {
-        $progressBar.removeClass('progress-bar-striped');
+        if (progressTimer) {
+            clearInterval(progressTimer);
+            progressTimer = null;
+        }
+        $progressBar.removeClass('progress-bar-striped', 'progress-bar-animated');
         updateProgressBar(1);
     };
 
@@ -74,29 +84,6 @@
             }
         };
 
-        const xhrFactory = function () {
-            const xhr = $.ajaxSettings.xhr();
-            // Upload progress
-            xhr.upload.onprogress = function (evt) {
-                if (evt.lengthComputable) {
-                    const percentComplete = evt.loaded / evt.total;
-                    updateProgressBar(percentComplete / 2);
-                } else {
-                    updateProgressBar(0.4);
-                }
-            };
-            // Download progress
-            xhr.addEventListener("progress", function (evt) {
-                if (evt.lengthComputable) {
-                    const percentComplete = evt.loaded / evt.total;
-                    updateProgressBar(0.5 + percentComplete / 2);
-                } else {
-                    updateProgressBar(0.9);
-                }
-            }, false);
-
-            return xhr;
-        };
 
         const highlighter = createHighlighter();
         const formatRequest = function () {
@@ -108,7 +95,6 @@
             initProgressBar();
             const options = getOptions();
             $.ajax({
-                xhr: xhrFactory,
                 url: 'api/format?' + $.param(options),
                 method: 'POST',
                 contentType: "text/plain; charset=utf-8",
