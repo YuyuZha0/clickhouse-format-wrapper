@@ -121,9 +121,9 @@
                         $output.html(`<code>${data}</code>`);
                     }
                 }
+                completeProgressBar();
             }).fail(function (xhr, status, error) {
                 $output.html(`<p class="text-danger">${xhr.responseText}</p>`);
-            }).always(function () {
                 completeProgressBar();
             });
         }
