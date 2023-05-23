@@ -142,7 +142,7 @@
             }
             timer = setTimeout(formatRequest, 200);
         });
-        $('#mainForm input[type="checkbox"]').on('change', formatRequest);
+        // $('#mainForm input[type="checkbox"]').on('change', formatRequest);
         $formatBtn.on('click', formatRequest);
 
         const initClipboard = function () {
