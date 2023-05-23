@@ -24,6 +24,9 @@
     const $maxParserDepth = $('#maxParserDepthInput');
     const $progressBar = $('#progressBar');
 
+    const $autoFormat = $('#autoFormatCheck');
+    const $formatBtn = $('#formatBtn');
+
     const updateProgressBar = function (rate) {
         const nPercent = Math.min(Math.round(rate * 100), 100);
         $progressBar.css('width', `${nPercent}%`);
@@ -121,9 +124,9 @@
                         $output.html(`<code>${data}</code>`);
                     }
                 }
-                completeProgressBar();
             }).fail(function (xhr, status, error) {
                 $output.html(`<p class="text-danger">${xhr.responseText}</p>`);
+            }).always(function () {
                 completeProgressBar();
             });
         }
@@ -132,10 +135,15 @@
         $input.on('input', function () {
             if (timer) {
                 clearTimeout(timer);
+                timer = null;
+            }
+            if (!$autoFormat.prop('checked')) {
+                return;
             }
             timer = setTimeout(formatRequest, 200);
         });
         $('#mainForm input[type="checkbox"]').on('change', formatRequest);
+        $formatBtn.on('click', formatRequest);
 
         const initClipboard = function () {
             if (window.Clipboard) {

@@ -68,9 +68,18 @@
                        title="Maximum parser depth (recursion depth of recursive descend parser).">maxParserDepth:</label>
                 <input type="number" class="form-control" id="maxParserDepthInput">
             </div>
+            <div class="form-check ml-2">
+                <input type="checkbox" checked="checked" class="form-check-input" id="autoFormatCheck">
+                <label class="form-check-label" for="autoFormatCheck" data-toggle="tooltip" data-placement="bottom"
+                       title="Enable auto format">autoFormat</label>
+            </div>
+            <div class="form-group ml-2">
+                <button class="btn btn-outline-secondary" type="button" id="formatBtn">Format
+                </button>
+            </div>
             <div class="form-group ml-2">
                 <button class="btn btn-outline-secondary" type="button" id="copyBtn"
-                        data-clipboard-target="#sqlOutput">Copy
+                        data-clipboard-target="#sqlOutput">Copy to Clipboard
                 </button>
             </div>
         </form>
