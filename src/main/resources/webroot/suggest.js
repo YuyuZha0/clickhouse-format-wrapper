@@ -10,7 +10,7 @@
     const options = {};
     const registerKeywords = function (keyword) {
         const key = keyword.slice(0, 1);
-        if (Object.hasOwn(options, key)) {
+        if (!Object.hasOwn(options, key)) {
             options[key] = {
                 data: [keyword], map: mapFunc
             };
