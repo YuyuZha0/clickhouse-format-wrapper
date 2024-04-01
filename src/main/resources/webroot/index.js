@@ -128,6 +128,7 @@
                 $output.html(`<p class="text-danger">${xhr.responseText}</p>`);
             }).always(function () {
                 completeProgressBar();
+                window.localStorage.setItem('sql', sql);
             });
         }
 
@@ -153,6 +154,14 @@
             }
         };
         initClipboard();
+
+        const fillInput = function () {
+            const sql = window.localStorage.getItem('sql');
+            if (sql) {
+                $input.val(sql);
+            }
+        };
+        fillInput();
 
     });
 })(window.jQuery);

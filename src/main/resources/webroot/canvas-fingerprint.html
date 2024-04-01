@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta content="*" http-equiv="Access-Control-Allow-Origin"/>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+</head>
+<body>
+<script type="application/javascript">
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    // Text with lowercase/uppercase/punctuation symbols
+    const txt = "BrowserLeaks,com <canvas> 1.0";
+    ctx.textBaseline = "top";
+    // The most common type
+    ctx.font = "14px 'Arial'";
+    ctx.textBaseline = "alphabetic";
+    ctx.fillStyle = "#f60";
+    ctx.fillRect(125, 1, 62, 20);
+    // Some tricks for color mixing to increase the difference in rendering
+    ctx.fillStyle = "#069";
+    ctx.fillText(txt, 2, 15);
+    ctx.fillStyle = "rgba(102, 204, 0, 0.7)";
+    ctx.fillText(txt, 4, 17);
+
+    const canvasData = canvas.toDataURL();
+
+    canvas.remove();
+    const hashBrowser = val =>
+        crypto.subtle
+            .digest('SHA-256', new TextEncoder('utf-8').encode(val))
+            .then(h => {
+                let hexes = [],
+                    view = new DataView(h);
+                for (let i = 0; i < view.byteLength; i += 4)
+                    hexes.push(('00000000' + view.getUint32(i).toString(16)).slice(-8));
+                return hexes.join('');
+            });
+    hashBrowser(canvasData).then(
+        hash => {
+            const p = document.createElement('p');
+            p.innerText = hash;
+            document.body.append(p);
+        }
+    )
+</script>
+</body>
+</html>
