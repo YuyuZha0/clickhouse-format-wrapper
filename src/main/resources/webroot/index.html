@@ -9,9 +9,9 @@
           content="Free online clickhouse sql formatter, support highlighting, compatible with clickhouse-format"/>
     <title>Online Clickhouse SQL Formatter</title>
     <link rel="icon" type="image/x-icon" href="https://clickhouse.com/docs/img/docs_favicon.ico">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css"/>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.0.0/dist/css/bootstrap.min.css"
           integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-suggest@2.1.0/dist/bootstrap-suggest.min.css">
     <style>
         body {
             font-family: "Source Code Pro", "Menlo", "Monaco", "Consolas", "Courier New", "Arial", "Helvetica", sans-serif;
@@ -75,12 +75,13 @@
                        title="Enable auto format">autoFormat</label>
             </div>
             <div class="form-group ml-2">
-                <button class="btn btn-outline-secondary" type="button" id="formatBtn">Format
+                <button class="btn btn-outline-secondary" type="button" id="formatBtn"><i class="fa fa-play"
+                                                                                          aria-hidden="true"></i>
                 </button>
             </div>
             <div class="form-group ml-2">
                 <button class="btn btn-outline-secondary" type="button" id="copyBtn"
-                        data-clipboard-target="#sqlOutput">Copy to Clipboard
+                        data-clipboard-target="#sqlOutput"><i class="fa fa-clipboard" aria-hidden="true"></i>
                 </button>
             </div>
         </form>
