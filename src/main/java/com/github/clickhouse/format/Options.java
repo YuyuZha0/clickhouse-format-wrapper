@@ -6,10 +6,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.CaseFormat;
 import com.google.common.collect.ImmutableMap;
 import io.vertx.core.MultiMap;
-import lombok.Getter;
-import lombok.NonNull;
-import lombok.Setter;
-
 import java.io.Serializable;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
@@ -19,28 +15,32 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import lombok.Getter;
+import lombok.NonNull;
+import lombok.Setter;
 
-// Allowed options:
-//  --query arg                              query to format
-//  -h [ --help ]                            produce help message
-//  --hilite                                 add syntax highlight with ANSI terminal escape
-// sequences
-//  --oneline                                format in single line
-//  -q [ --quiet ]                           just check syntax, no output on success
-//  -n [ --multiquery ]                      allow multiple queries in the same file
-//  --obfuscate                              obfuscate instead of formatting
-//  --backslash                              add a backslash at the end of each line of the
-// formatted query
-//  --allow_settings_after_format_in_insert  Allow SETTINGS after FORMAT, but note, that this is not
-// always safe
-//  --seed arg                               seed (arbitrary string) that determines the result of
-// obfuscation
-//  --max_query_size arg                     The maximum number of bytes of a query string parsed by
-// the SQL parser. Data in the VALUES clause of INSERT
-//                                           queries is processed by a separate stream parser (that
-// consumes O(1) RAM) and not affected by this restriction.
-//  --max_parser_depth arg                   Maximum parser depth (recursion depth of recursive
-// descend parser).
+/**
+ *
+ *
+ * <pre>
+ * Allowed options:
+ *   --query arg                              query to format
+ *   -h [ --help ]                            produce help message
+ *   --comments                               keep comments in the output
+ *   --hilite                                 add syntax highlight with ANSI terminal escape sequences
+ *   --oneline                                format in single line
+ *   --max_line_length arg (=0)               format in single line queries with length less than specified
+ *   -q [ --quiet ]                           just check syntax, no output on success
+ *   -n [ --multiquery ]                      allow multiple queries in the same file
+ *   --obfuscate                              obfuscate instead of formatting
+ *   --backslash                              add a backslash at the end of each line of the formatted query
+ *   --allow_settings_after_format_in_insert  Allow SETTINGS after FORMAT, but note, that this is not always safe
+ *   --seed arg                               seed (arbitrary string) that determines the result of obfuscation
+ *   --max_query_size arg                     The maximum number of bytes of a query string parsed by the SQL parser. Data in the VALUES clause of INSERT
+ *                                            queries is processed by a separate stream parser (that consumes O(1) RAM) and not affected by this restriction.
+ *   --max_parser_depth arg                   Maximum parser depth (recursion depth of recursive descend parser).
+ *   </pre>
+ */
 @Getter
 @Setter
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -67,7 +67,9 @@ public final class Options implements Serializable {
   }
 
   private Boolean hilite;
+  private Boolean comments;
   private Boolean oneline;
+  private Integer maxLineLength;
   private Boolean multiquery;
   private Boolean backslash;
   private Boolean allowSettingsAfterFormatInInsert;
