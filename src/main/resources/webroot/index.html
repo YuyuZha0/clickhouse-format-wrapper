@@ -37,6 +37,18 @@
             </button>
         </div>
         <div class="form-group ml-2">
+            <button class="btn btn-outline-secondary" type="button" id="undoBtn" data-toggle="tooltip"
+                    data-placement="bottom"
+                    title="Undo"><i class="fa fa-undo" aria-hidden="true"></i>
+            </button>
+        </div>
+        <div class="form-group ml-2">
+            <button class="btn btn-outline-secondary" type="button" id="redoBtn" data-toggle="tooltip"
+                    data-placement="bottom"
+                    title="Redo"><i class="fa fa-repeat" aria-hidden="true"></i>
+            </button>
+        </div>
+        <div class="form-group ml-2">
             <button class="btn btn-outline-secondary" type="button" id="clearBtn" data-toggle="tooltip"
                     data-placement="bottom" title="Clear"><i class="fa fa-trash" aria-hidden="true"></i>
             </button>
@@ -176,72 +188,92 @@
         const $autoFormat = $('#autoFormatCheck');
         const $formatBtn = $('#formatBtn');
         const $clearBtn = $('#clearBtn');
+        const $undoBtn = $('#undoBtn');
+        const $redoBtn = $('#redoBtn');
+
+        const getOptions = function () {
+            const obj = {
+                hilite: $hilite.prop('checked'),
+                oneline: $oneline.prop('checked'),
+                comments: $comments.prop('checked'),
+                multiquery: $multiquery.prop('checked'),
+                backslash: $backslash.prop('checked'),
+                allowSettingsAfterFormatInInsert: $allowSettingsAfterFormatInInsert.prop('checked'),
+                obfuscate: $obfuscate.prop('checked'),
+                seed: $seed.val(),
+                maxQuerySize: $maxQuerySize.val(),
+                maxParserDepth: $maxParserDepth.val(),
+                maxLineLength: $maxLineLength.val()
+            };
+            for (let key in obj) {
+                const val = obj[key];
+                if (val === '' || val === null || val === undefined || val === false) {
+                    delete obj[key];
+                }
+            }
+            return obj;
+        };
+
+        const createHighlighter = function () {
+            if (window.AnsiUp) {
+                const ansiUp = new AnsiUp();
+                return function (text) {
+                    return ansiUp.ansi_to_html(text);
+                };
+            } else {
+                console.warn('AnsiUp not available!');
+                return function (text) {
+                    return text;
+                };
+            }
+        };
+
+
+        const highlighter = createHighlighter();
+        const formatRequest = function () {
+            const sql = $input.val();
+            if (/^\s*$/.test(sql)) {
+                return;
+            }
+            $output.html('<div class="d-flex justify-content-center"><div class="spinner-border text-info" role="status"><span class="sr-only">Loading...</span></div></div>');
+            const options = getOptions();
+            $.ajax({
+                url: 'api/format?' + $.param(options),
+                method: 'POST',
+                contentType: "text/plain; charset=utf-8",
+                data: sql,
+                dataType: 'text'
+            }).done(function (data) {
+                if (typeof data === 'string' || data instanceof String) {
+                    if (options.hilite) {
+                        $output.html(highlighter(data));
+                    } else {
+                        $output.html(`<code>${data}</code>`);
+                    }
+                }
+            }).fail(function (xhr, status, error) {
+                $output.html(`<p class="text-danger">${xhr.responseText}</p>`);
+            });
+        };
 
 
         $(document).ready(function () {
-            const getOptions = function () {
-                const obj = {
-                    hilite: $hilite.prop('checked'),
-                    oneline: $oneline.prop('checked'),
-                    comments: $comments.prop('checked'),
-                    multiquery: $multiquery.prop('checked'),
-                    backslash: $backslash.prop('checked'),
-                    allowSettingsAfterFormatInInsert: $allowSettingsAfterFormatInInsert.prop('checked'),
-                    obfuscate: $obfuscate.prop('checked'),
-                    seed: $seed.val(),
-                    maxQuerySize: $maxQuerySize.val(),
-                    maxParserDepth: $maxParserDepth.val(),
-                    maxLineLength: $maxLineLength.val()
-                };
-                for (let key in obj) {
-                    const val = obj[key];
-                    if (val === '' || val === null || val === undefined || val === false) {
-                        delete obj[key];
-                    }
-                }
-                return obj;
-            };
-
-            const createHighlighter = function () {
-                if (window.AnsiUp) {
-                    const ansiUp = new AnsiUp();
-                    return function (text) {
-                        return ansiUp.ansi_to_html(text);
-                    };
-                } else {
-                    console.warn('AnsiUp not available!');
-                    return function (text) {
-                        return text;
-                    };
-                }
-            };
 
 
-            const highlighter = createHighlighter();
-            const formatRequest = function () {
-                const sql = $input.val();
-                if (/^\s*$/.test(sql)) {
+            const undoStack = [];
+            const redoStack = [];
+
+            function saveState() {
+                const state = $input.val();
+                if (state.length === 0) {
                     return;
                 }
-                $output.html('<div class="d-flex justify-content-center"><div class="spinner-border text-info" role="status"><span class="sr-only">Loading...</span></div></div>');
-                const options = getOptions();
-                $.ajax({
-                    url: 'api/format?' + $.param(options),
-                    method: 'POST',
-                    contentType: "text/plain; charset=utf-8",
-                    data: sql,
-                    dataType: 'text'
-                }).done(function (data) {
-                    if (typeof data === 'string' || data instanceof String) {
-                        if (options.hilite) {
-                            $output.html(highlighter(data));
-                        } else {
-                            $output.html(`<code>${data}</code>`);
-                        }
-                    }
-                }).fail(function (xhr, status, error) {
-                    $output.html(`<p class="text-danger">${xhr.responseText}</p>`);
-                });
+                if (undoStack.length >= 10) {
+                    undoStack.shift();
+                }
+                undoStack.push(state);
+                window.localStorage.setItem('clickhouse-sql-formatter-state', state);
+                redoStack.length = 0; // Clear redo stack when new action is performed
             }
 
             let timer = null;
@@ -250,10 +282,12 @@
                     clearTimeout(timer);
                     timer = null;
                 }
-                if (!$autoFormat.prop('checked')) {
-                    return;
-                }
-                timer = setTimeout(formatRequest, 200);
+                timer = setTimeout(function () {
+                    saveState();
+                    if ($autoFormat.prop('checked')) {
+                        formatRequest();
+                    }
+                }, 300);
             });
             // $('#mainForm input[type="checkbox"]').on('change', formatRequest);
             $formatBtn.on('click', formatRequest);
@@ -269,8 +303,25 @@
 
             $clearBtn.on('click', function () {
                 $input.val('');
-                $output.empty();
             });
+            $undoBtn.on('click', function () {
+                if (undoStack.length > 1) {
+                    redoStack.push(undoStack.pop());
+                    $input.val(undoStack[undoStack.length - 1]);
+                }
+            });
+            $redoBtn.on('click', function () {
+                if (redoStack.length > 0) {
+                    const nextState = redoStack.pop();
+                    undoStack.push(nextState);
+                    $input.val(nextState);
+                }
+            });
+
+            const state = window.localStorage.getItem('clickhouse-sql-formatter-state');
+            if (state) {
+                $input.val(state);
+            }
 
         });
     })(window.jQuery);
