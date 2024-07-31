@@ -37,20 +37,14 @@
             </button>
         </div>
         <div class="form-group ml-2">
+            <button class="btn btn-outline-secondary" type="button" id="clearBtn" data-toggle="tooltip"
+                    data-placement="bottom" title="Clear"><i class="fa fa-trash" aria-hidden="true"></i>
+            </button>
+        </div>
+        <div class="form-group ml-2">
             <button class="btn btn-outline-secondary" type="button" id="undoBtn" data-toggle="tooltip"
                     data-placement="bottom"
                     title="Undo"><i class="fa fa-undo" aria-hidden="true"></i>
-            </button>
-        </div>
-        <div class="form-group ml-2">
-            <button class="btn btn-outline-secondary" type="button" id="redoBtn" data-toggle="tooltip"
-                    data-placement="bottom"
-                    title="Redo"><i class="fa fa-repeat" aria-hidden="true"></i>
-            </button>
-        </div>
-        <div class="form-group ml-2">
-            <button class="btn btn-outline-secondary" type="button" id="clearBtn" data-toggle="tooltip"
-                    data-placement="bottom" title="Clear"><i class="fa fa-trash" aria-hidden="true"></i>
             </button>
         </div>
         <div class="form-group ml-2">
@@ -189,7 +183,6 @@
         const $formatBtn = $('#formatBtn');
         const $clearBtn = $('#clearBtn');
         const $undoBtn = $('#undoBtn');
-        const $redoBtn = $('#redoBtn');
 
         const getOptions = function () {
             const obj = {
@@ -228,6 +221,21 @@
             }
         };
 
+        const localStorageKey = 'clickhouse-sql-formatter-state';
+        const saveState = function () {
+            const state = $input.val();
+            if (state.length === 0) {
+                return;
+            }
+            window.localStorage.setItem(localStorageKey, state);
+        };
+        const restoreState = function () {
+            const state = window.localStorage.getItem(localStorageKey);
+            if (state && state.length > 0) {
+                $input.val(state);
+            }
+        };
+
 
         const highlighter = createHighlighter();
         const formatRequest = function () {
@@ -235,7 +243,7 @@
             if (/^\s*$/.test(sql)) {
                 return;
             }
-            window.localStorage.setItem('clickhouse-sql-formatter-state', sql);
+            saveState();
             $output.html('<div class="d-flex justify-content-center"><div class="spinner-border text-info" role="status"><span class="sr-only">Loading...</span></div></div>');
             const options = getOptions();
             $.ajax({
@@ -259,35 +267,15 @@
 
 
         $(document).ready(function () {
-
-
-            const undoStack = [];
-            const redoStack = [];
-
-            function saveState() {
-                const state = $input.val();
-                if (state.length === 0) {
-                    return;
-                }
-                if (undoStack.length >= 10) {
-                    undoStack.shift();
-                }
-                undoStack.push(state);
-                redoStack.length = 0; // Clear redo stack when new action is performed
-            }
-
             let timer = null;
             $input.on('input', function () {
                 if (timer) {
                     clearTimeout(timer);
                     timer = null;
                 }
-                timer = setTimeout(function () {
-                    saveState();
-                    if ($autoFormat.prop('checked')) {
-                        formatRequest();
-                    }
-                }, 200);
+                if ($autoFormat.prop('checked')) {
+                    timer = setTimeout(formatRequest, 200);
+                }
             });
             // $('#mainForm input[type="checkbox"]').on('change', formatRequest);
             $formatBtn.on('click', formatRequest);
@@ -304,27 +292,13 @@
             $clearBtn.on('click', function () {
                 saveState();
                 $input.val('');
+                $output.empty();
+                $input.focus();
             });
             $undoBtn.on('click', function () {
-                if (undoStack.length >= 1) {
-                    const currentState = undoStack.pop();
-                    redoStack.push(currentState);
-                    $input.val(currentState);
-                }
+                restoreState();
             });
-            $redoBtn.on('click', function () {
-                if (redoStack.length > 0) {
-                    const nextState = redoStack.pop();
-                    undoStack.push(nextState);
-                    $input.val(nextState);
-                }
-            });
-
-            const state = window.localStorage.getItem('clickhouse-sql-formatter-state');
-            if (state) {
-                $input.val(state);
-            }
-
+            restoreState();
         });
     })(window.jQuery);
 </script>
