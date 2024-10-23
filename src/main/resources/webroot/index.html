@@ -1,6 +1,19 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-CCS6CPTZW9"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+
+        function gtag() {
+            dataLayer.push(arguments);
+        }
+
+        gtag('js', new Date());
+
+        gtag('config', 'G-CCS6CPTZW9');
+    </script>
     <meta charset="UTF-8">
     <meta content="*" http-equiv="Access-Control-Allow-Origin"/>
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
@@ -17,6 +30,64 @@
     <style>
         .sql-box {
             font-family: "Source Code Pro", "Menlo", "Monaco", "Consolas", "Courier New", "Arial", "Helvetica", sans-serif;
+        }
+
+        body {
+            background-color: #f8f9fa;
+            font-family: "Source Code Pro", "Menlo", "Monaco", "Consolas", "Courier New", "Arial", "Helvetica", sans-serif;
+        }
+
+        h3 {
+            color: #343a40;
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        button {
+            margin: 5px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        textarea#sqlInput {
+            width: 100%;
+            height: 300px;
+            padding: 10px;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            background-color: #ffffff;
+            font-size: 14px;
+            color: #495057;
+        }
+
+        div#sqlOutput {
+            width: 100%;
+            height: 300px;
+            padding: 10px;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            background-color: #ffffff;
+            font-size: 14px;
+            color: #495057;
+            overflow: auto;
+        }
+
+        button:hover {
+            background-color: #e2e6ea;
+        }
+
+        .dropdown-menu {
+            padding: 10px;
+        }
+
+        .form-check-label {
+            margin-left: 5px;
+        }
+
+        .spinner-border {
+            margin-top: 20px;
         }
     </style>
 </head>
@@ -253,6 +324,10 @@
                 data: sql,
                 dataType: 'text'
             }).done(function (data) {
+                gtag('event', 'format_success', {
+                    'inputLength': sql.length,
+                    'outputLength': data.length
+                });
                 if (typeof data === 'string' || data instanceof String) {
                     if (options.hilite) {
                         $output.html(highlighter(data));
@@ -261,6 +336,11 @@
                     }
                 }
             }).fail(function (xhr, status, error) {
+                gtag('event', 'format_error', {
+                    'inputLength': sql.length,
+                    'status': status,
+                    'error': error
+                });
                 $output.html(`<p class="text-danger">${xhr.responseText}</p>`);
             });
         };
