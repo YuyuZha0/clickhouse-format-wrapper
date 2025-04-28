@@ -2,15 +2,18 @@ package com.github.clickhouse.format;
 
 import com.google.common.collect.Lists;
 import com.google.common.io.ByteStreams;
+import com.google.inject.Inject;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufOutputStream;
+import io.vertx.core.Future;
+import io.vertx.core.Vertx;
 import io.vertx.core.buffer.Buffer;
 import io.vertx.core.buffer.impl.VertxByteBufAllocator;
 import java.io.*;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import lombok.NonNull;
 import lombok.extern.slf4j.Slf4j;
 
@@ -20,7 +23,14 @@ public final class CommandLineSqlFormatter {
   private static final String BIN_NAME = "clickhouse-format";
   private static final int MAX_CONCURRENT_FORMATTING = 10;
   private static final int TIMEOUT_SECONDS = 30;
-  private static final Semaphore semaphore = new Semaphore(MAX_CONCURRENT_FORMATTING);
+
+  private final AtomicInteger concurrentCount = new AtomicInteger(0);
+  private final Vertx vertx;
+
+  @Inject
+  public CommandLineSqlFormatter(Vertx vertx) {
+    this.vertx = vertx;
+  }
 
   private static File initClickhouseHome() {
     String clickhouseHome = System.getenv("CLICKHOUSE_HOME");
@@ -61,20 +71,23 @@ public final class CommandLineSqlFormatter {
     }
   }
 
-  public Buffer format(@NonNull Buffer input, @NonNull Options options) throws Exception {
-    try {
-      if (!semaphore.tryAcquire(TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
-        throw new SqlFormatException(-1, Buffer.buffer("Timeout waiting for formatter"));
-      }
-      try {
-        return formatWithProcess(input, options);
-      } finally {
-        semaphore.release();
-      }
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-      throw new SqlFormatException(-1, Buffer.buffer("Interrupted while formatting"));
+  public Future<Buffer> format(@NonNull Buffer input, @NonNull Options options) {
+    if (concurrentCount.incrementAndGet() >= MAX_CONCURRENT_FORMATTING) {
+      concurrentCount.decrementAndGet();
+      return Future.failedFuture(new IllegalStateException("Too many concurrent formatting tasks"));
     }
+    return vertx.executeBlocking(
+        promise -> {
+          try {
+            Buffer output = formatWithProcess(input, options);
+            promise.complete(output);
+          } catch (Exception e) {
+            promise.fail(e);
+          } finally {
+            concurrentCount.decrementAndGet();
+          }
+        },
+        false);
   }
 
   private Buffer formatWithProcess(@NonNull Buffer input, @NonNull Options options)
@@ -115,7 +128,6 @@ public final class CommandLineSqlFormatter {
     List<String> command = new ArrayList<>();
     command.add(BIN_NAME);
     options.appendTo(command);
-    command.add("<");
     return command;
   }
 }

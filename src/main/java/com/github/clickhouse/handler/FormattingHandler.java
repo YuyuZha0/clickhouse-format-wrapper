@@ -12,7 +12,6 @@ import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.util.AsciiString;
 import io.vertx.core.AsyncResult;
 import io.vertx.core.Handler;
-import io.vertx.core.Promise;
 import io.vertx.core.buffer.Buffer;
 import io.vertx.core.http.HttpServerRequest;
 import io.vertx.core.http.HttpServerResponse;
@@ -23,12 +22,13 @@ public final class FormattingHandler implements Handler<RoutingContext> {
 
   private static final CharSequence TEXT_PLAIN =
       AsciiString.of(MediaType.PLAIN_TEXT_UTF_8.toString());
-  private final CommandLineSqlFormatter formatter = new CommandLineSqlFormatter();
+  private final CommandLineSqlFormatter formatter;
   private final ObjectMapper objectMapper;
 
   @Inject
-  public FormattingHandler(ObjectMapper objectMapper) {
+  public FormattingHandler(ObjectMapper objectMapper, CommandLineSqlFormatter formatter) {
     this.objectMapper = objectMapper;
+    this.formatter = formatter;
   }
 
   private static void endWithCodeAndMsg(
@@ -56,18 +56,15 @@ public final class FormattingHandler implements Handler<RoutingContext> {
       endWithCodeAndMsg(response, HttpResponseStatus.BAD_REQUEST, "Empty body");
       return;
     }
-    context
-        .vertx()
-        .executeBlocking(
-            (Promise<Buffer> promise) -> {
-              try {
-                Buffer result = formatter.format(body, options);
-                promise.tryComplete(result);
-              } catch (Throwable cause) {
-                promise.tryFail(cause);
-              }
-            },
-            false,
+
+    if (body.length() > 1024 * 1024) {
+      endWithCodeAndMsg(response, HttpResponseStatus.BAD_REQUEST, "Body too large");
+      return;
+    }
+
+    formatter
+        .format(body, options)
+        .onComplete(
             (AsyncResult<Buffer> result) -> {
               if (result.succeeded()) {
                 response

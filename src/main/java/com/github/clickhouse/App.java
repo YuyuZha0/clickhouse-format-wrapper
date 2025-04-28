@@ -55,7 +55,7 @@ public final class App extends AbstractVerticle {
                 .setPreferNativeTransport(true)
                 .setWorkerPoolSize(
                     Math.min(20, 2 * Runtime.getRuntime().availableProcessors() + 1)));
-    Injector injector = Guice.createInjector(new AppModule());
+    Injector injector = Guice.createInjector(new AppModule(vertx));
     App app = injector.getInstance(App.class);
     vertx.deployVerticle(
         app,
