@@ -440,7 +440,6 @@
             if (!isNotBlank(sql)) {
                 return;
             }
-            StageManager.save();
             elements.output.html('<div class="d-flex justify-content-center"><div class="spinner-border text-info" role="status"><span class="sr-only">Loading...</span></div></div>');
             const options = getOptions();
             $.ajax({
