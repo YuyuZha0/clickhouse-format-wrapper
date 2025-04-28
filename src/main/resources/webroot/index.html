@@ -241,37 +241,37 @@
                             <div class="form-check">
                                 <input type="checkbox" class="form-check-input" id="autoFormatCheck">
                                 <label class="form-check-label" for="autoFormatCheck" data-toggle="tooltip"
-                                       data-placement="right" title="Enable auto format">Auto Format</label>
+                                       data-placement="bottom" title="Enable auto format">Auto Format</label>
                             </div>
                             <div class="form-check">
                                 <input type="checkbox" checked="checked" class="form-check-input" id="hiliteCheck">
                                 <label class="form-check-label" for="hiliteCheck" data-toggle="tooltip"
-                                       data-placement="right"
+                                       data-placement="bottom"
                                        title="Add syntax highlight with ANSI terminal escape sequences">Highlight
                                     (ANSI)</label>
                             </div>
                             <div class="form-check">
                                 <input type="checkbox" checked="checked" class="form-check-input" id="commentsCheck">
                                 <label class="form-check-label" for="commentsCheck" data-toggle="tooltip"
-                                       data-placement="right"
+                                       data-placement="bottom"
                                        title="Keep comments in the output">Keep Comments</label>
                             </div>
                             <div class="form-check">
                                 <input type="checkbox" class="form-check-input" id="onelineCheck">
                                 <label class="form-check-label" for="onelineCheck" data-toggle="tooltip"
-                                       data-placement="right"
+                                       data-placement="bottom"
                                        title="Format in single line">Single Line</label>
                             </div>
                             <div class="form-check">
                                 <input type="checkbox" class="form-check-input" id="multiqueryCheck">
                                 <label class="form-check-label" for="multiqueryCheck" data-toggle="tooltip"
-                                       data-placement="right"
+                                       data-placement="bottom"
                                        title="Allow multiple queries in the same file">Allow Multi-query</label>
                             </div>
                             <div class="form-check">
                                 <input type="checkbox" class="form-check-input" id="backslashCheck">
                                 <label class="form-check-label" for="backslashCheck" data-toggle="tooltip"
-                                       data-placement="right"
+                                       data-placement="bottom"
                                        title="Add a backslash at the end of each line of the formatted query">Add
                                     Backslashes</label>
                             </div>
@@ -280,41 +280,41 @@
                                        id="allowSettingsAfterFormatInInsertCheck">
                                 <label class="form-check-label"
                                        for="allowSettingsAfterFormatInInsertCheck" data-toggle="tooltip"
-                                       data-placement="right"
+                                       data-placement="bottom"
                                        title="Allow SETTINGS after FORMAT, but note, that this is not always safe">Allow
                                     SETTINGS after FORMAT</label>
                             </div>
                             <div class="form-check">
                                 <input type="checkbox" class="form-check-input" id="obfuscateCheck">
                                 <label class="form-check-label" for="obfuscateCheck" data-toggle="tooltip"
-                                       data-placement="right"
+                                       data-placement="bottom"
                                        title="Obfuscate instead of formatting">Obfuscate</label>
                             </div>
 
                             <!-- Form Group examples (Apply similar structure to all) -->
                             <div class="dropdown-divider"></div> <!-- Separator -->
                             <div class="form-group">
-                                <label for="maxLineLengthInput" data-toggle="tooltip" data-placement="right"
+                                <label for="maxLineLengthInput" data-toggle="tooltip" data-placement="bottom"
                                        title="Format in single line queries with length less than specified">Max Line
                                     Length:</label>
                                 <input type="number" class="form-control" id="maxLineLengthInput"
                                        placeholder="e.g., 120">
                             </div>
                             <div class="form-group">
-                                <label for="seedInput" data-toggle="tooltip" data-placement="right"
+                                <label for="seedInput" data-toggle="tooltip" data-placement="bottom"
                                        title="Seed (arbitrary string) that determines the result of obfuscation">Obfuscation
                                     Seed:</label>
                                 <input type="text" class="form-control" id="seedInput">
                             </div>
                             <div class="form-group">
-                                <label for="maxQuerySizeInput" data-toggle="tooltip" data-placement="right"
+                                <label for="maxQuerySizeInput" data-toggle="tooltip" data-placement="bottom"
                                        title="The maximum number of bytes of a query string parsed by the SQL parser.">Max
                                     Query Size (bytes):</label>
                                 <input type="number" class="form-control" id="maxQuerySizeInput"
                                        placeholder="e.g., 262144">
                             </div>
                             <div class="form-group">
-                                <label for="maxParserDepthInput" data-toggle="tooltip" data-placement="bottom"
+                                <label for="maxParserDepthInput" data-toggle="tooltip" data-placement="top"
                                        title="Maximum parser depth (recursion depth of recursive descend parser).">Max
                                     Parser Depth:</label>
                                 <input type="number" class="form-control" id="maxParserDepthInput"
@@ -353,7 +353,21 @@
 <script type="text/javascript">
     $(function () {
 
-        $('[data-toggle="tooltip"]').tooltip();
+        // Initialize tooltips OUTSIDE the dropdown (keep simple or add container:body)
+        $('.control-panel > [data-toggle="tooltip"]').tooltip({
+            container: 'body' // Good practice anyway
+        });
+        // Or if the simple version worked fine for these:
+        // $('.control-panel > [data-toggle="tooltip"]').tooltip();
+
+
+        // Initialize tooltips INSIDE the dropdown SEPARATELY with delay and container
+        $('.dropdown-menu [data-toggle="tooltip"]').tooltip({
+            container: 'body', // Still recommended for dropdowns
+            delay: {"show": 100, "hide": 100} // Add delay (especially for hide)
+            // You can adjust the hide delay (e.g., 50, 150)
+        });
+
 
         const elements = Object.freeze({
             editor: CodeMirror.fromTextArea(document.getElementById("sqlInput"), {
