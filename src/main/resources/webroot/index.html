@@ -106,7 +106,7 @@
         /* Style the CodeMirror editor */
         .CodeMirror {
             border: 1px solid #ced4da;
-            height: 50vh; /* Make editors take significant vertical space */
+            height: 70vh; /* Make editors take significant vertical space */
             min-height: 300px; /* Minimum height */
             font-size: 0.95em;
             border-radius: 0.25rem;
@@ -115,7 +115,7 @@
         /* Style the output area */
         #sqlOutput {
             border: 1px solid #ced4da;
-            height: 50vh; /* Match input editor height */
+            height: 70vh; /* Match input editor height */
             min-height: 300px; /* Minimum height */
             background-color: #e9ecef; /* Slightly different background for output */
             padding: 10px;
@@ -495,7 +495,6 @@
         elements.clearBtn.on('click', function () {
             elements.editor.setValue('');
             elements.output.empty();
-            elements.editor.focus();
         });
         elements.undoBtn.on('click', function () {
             elements.editor.undo();
