@@ -112,34 +112,41 @@
             border: 1px solid var(--dark-gray);
             height: 65vh;
             background-color: #fff;
-            padding: 10px;
-            font-family: Consolas, "Courier New", monospace;
-            font-size: 0.95em;
+            padding: 0; /* Padding will be on the inner <pre> tag */
             overflow-y: auto;
             border-radius: 0.25rem;
-            line-height: 1.4;
             display: flex;
             flex-direction: column;
-            /* === CORRECTED STYLES FOR LINE BREAKS === */
-            white-space: pre-wrap; /* Preserves newlines and wraps lines that are too long. */
-            overflow-wrap: break-word; /* Breaks words only if they would otherwise overflow. */
         }
 
         #sqlOutput .placeholder-text {
             color: #6c757d;
             margin: auto;
             text-align: center;
+            padding: 10px;
         }
 
-        #sqlOutput code {
-            display: block;
-            white-space: inherit; /* Inherit wrapping rules from parent */
+        /* Styling for the pre element that holds the code */
+        #sqlOutput pre {
+            margin: 0; /* Remove browser default margin */
+            padding: 10px; /* Apply padding here */
+            flex-grow: 1;
+            font-family: Consolas, "Courier New", monospace;
+            font-size: 0.95em;
+            line-height: 1.4;
             color: var(--text-color);
+            /* For non-highlighted code, this ensures wrapping works correctly */
+            white-space: pre-wrap;
+            overflow-wrap: break-word;
         }
 
-        #sqlOutput p.text-danger {
-            margin: 0;
-            font-weight: bold;
+        /* For highlighted code, we don't need pre-wrap because ansi_up adds <br> tags */
+        #sqlOutput .highlighted-output {
+            white-space: normal;
+        }
+
+        #sqlOutput .text-danger {
+            color: #dc3545;
         }
 
         .footer {
@@ -158,14 +165,9 @@
             color: var(--text-color);
         }
 
-        /* Minor adjustment for mobile */
         @media (max-width: 767.98px) {
             .CodeMirror, #sqlOutput {
                 height: 40vh;
-            }
-
-            .main-container {
-                padding: 1rem;
             }
         }
     </style>
@@ -177,7 +179,6 @@
         <h3>Online Clickhouse SQL Formatter</h3>
     </header>
 
-    <!-- Control Panel -->
     <div class="row">
         <div class="col-12">
             <div class="control-panel">
@@ -205,8 +206,6 @@
                    data-toggle="tooltip" data-placement="bottom" title="ClickHouse SQL Reference">
                     <i class="fa fa-book"></i>
                 </a>
-
-                <!-- Options Dropdown (pushed to the right) -->
                 <div class="dropdown ml-auto">
                     <button class="btn btn-outline-secondary dropdown-toggle" type="button" id="dropdownMenu2"
                             data-toggle="dropdown" aria-haspopup="true" aria-expanded="false" data-toggle="tooltip"
@@ -260,7 +259,6 @@
                                 <label class="form-check-label" for="obfuscateCheck"
                                        title="Obfuscate instead of formatting">Obfuscate</label>
                             </div>
-
                             <div class="dropdown-divider"></div>
                             <div class="form-group">
                                 <label for="maxLineLengthInput"
@@ -296,7 +294,6 @@
         </div>
     </div>
 
-    <!-- SQL Input/Output Row -->
     <div class="row sql-areas mt-3">
         <div class="col-md-6 mb-3 mb-md-0">
             <label class="editor-label" for="sqlInput">Source SQL</label>
@@ -313,7 +310,7 @@
     <div class="container">
         <span>Powered by <a href="https://clickhouse.com/docs/en/operations/utilities/clickhouse-format"
                             target="_blank">clickhouse-format</a>.</span>
-        <span>View on <a href="https://github.com/ClickHouse/clickhouse-sql-formatter-web" target="_blank"><i
+        <span>View on <a href="https://github.com/YuyuZha0/clickhouse-format-wrapper" target="_blank"><i
                 class="fa fa-github"></i> GitHub</a>.</span>
     </div>
 </footer>
@@ -323,18 +320,11 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/4.6.2/js/bootstrap.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/clipboard.js/2.0.11/clipboard.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/ansi_up@5.1.0/ansi_up.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/codemirror.min.js"
-        integrity="sha512-6cPYokihlrofMNApz7OXVQNObWjLiKGIBBb7+UB+AuMiRCLKmFKgrwms21sHq3bdFFZWpfHYRJBJvMFMPj1S9g=="
-        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/codemirror.min.js"></script>
 <script type="text/javascript">
     $(function () {
-        // Initialize all tooltips
         $('[data-toggle="tooltip"]').tooltip({container: 'body'});
-
-        // Prevent dropdown from closing when interacting with form elements
-        $('.dropdown-menu').on('click', function (e) {
-            e.stopPropagation();
-        });
+        $('.dropdown-menu').on('click', (e) => e.stopPropagation());
 
         const elements = Object.freeze({
             editor: CodeMirror.fromTextArea(document.getElementById("sqlInput"), {
@@ -374,8 +364,9 @@
         });
 
         const outputPlaceholder = '<div class="placeholder-text">Formatted SQL will appear here</div>';
+        const highlighter = new AnsiUp();
 
-        const getOptions = function () {
+        function getOptions() {
             const obj = {
                 hilite: elements.hilite.prop('checked'),
                 oneline: elements.oneline.prop('checked'),
@@ -390,27 +381,20 @@
                 maxLineLength: elements.maxLineLength.val()
             };
             for (let key in obj) {
-                const val = obj[key];
-                if (!val) { // handles false, '', null, undefined, 0
+                if (!obj[key]) {
                     delete obj[key];
                 }
             }
             return obj;
-        };
-
-        const highlighter = new AnsiUp();
-
-        const isNotBlank = function (str) {
-            return str && str.trim().length > 0;
-        };
+        }
 
         function formatRequest() {
             const sql = elements.editor.getValue();
-            if (!isNotBlank(sql)) {
-                return;
-            }
+            if (!sql || !sql.trim()) return;
+
             elements.output.html('<div class="d-flex justify-content-center align-items-center h-100"><div class="spinner-border text-primary" role="status"><span class="sr-only">Loading...</span></div></div>');
             const options = getOptions();
+
             $.ajax({
                 url: 'api/format?' + $.param(options),
                 method: 'POST',
@@ -419,61 +403,53 @@
                 dataType: 'text'
             }).done(function (data) {
                 gtag('event', 'format_success', {'inputLength': sql.length, 'outputLength': data.length});
+
                 if (options.hilite) {
-                    elements.output.html(highlighter.ansi_to_html(data));
+                    // For highlighted text, ansi_up converts \n to <br>.
+                    // We put this in a <pre> that does NOT preserve whitespace,
+                    // letting the <br> tags handle line breaks.
+                    const highlightedHtml = highlighter.ansi_to_html(data);
+                    elements.output.html(`<pre class="highlighted-output"><code>${highlightedHtml}</code></pre>`);
                 } else {
-                    // Wrap in code tag for consistent styling and semantic meaning
-                    elements.output.html($('<code/>').text(data));
+                    // For plain text, we create a <pre><code> block and set its text content.
+                    // The 'pre-wrap' style on the <pre> tag will correctly handle newlines.
+                    const pre = $('<pre></pre>').append($('<code></code>').text(data));
+                    elements.output.html(pre);
                 }
-                // Set the text content for clipboard.js
                 elements.output.attr('data-clipboard-text', data);
-            }).fail(function (xhr, status, error) {
-                gtag('event', 'format_error', {'inputLength': sql.length, 'status': status, 'error': error});
-                elements.output.html(`<p class="text-danger">${xhr.responseText || 'An unknown error occurred.'}</p>`);
+
+            }).fail(function (xhr) {
+                gtag('event', 'format_error', {'inputLength': sql.length, 'status': xhr.status});
+                const errorText = xhr.responseText || 'An unknown error occurred.';
+                const pre = $('<pre class="text-danger"></pre>').text(errorText);
+                elements.output.html(pre);
                 elements.output.removeAttr('data-clipboard-text');
             });
         }
 
         let timer = null;
-        elements.editor.on('change', function () {
-            if (timer) {
-                clearTimeout(timer);
-            }
+        elements.editor.on('change', () => {
+            if (timer) clearTimeout(timer);
             if (elements.autoFormat.prop('checked')) {
                 timer = setTimeout(formatRequest, 300);
             }
         });
         elements.formatBtn.on('click', formatRequest);
 
-        // Initialize Clipboard.js and provide user feedback
         const clipboard = new ClipboardJS('#copyBtn', {
-            text: function (trigger) {
-                // Copy the plain text content, not the HTML
-                return $('#sqlOutput').attr('data-clipboard-text') || '';
-            }
+            text: (trigger) => $('#sqlOutput').attr('data-clipboard-text') || ''
         });
-
-        clipboard.on('success', function (e) {
+        clipboard.on('success', (e) => {
             const trigger = $(e.trigger);
             const originalTitle = trigger.attr('data-original-title');
             trigger.attr('data-original-title', 'Copied!').tooltip('show');
-            setTimeout(function () {
+            setTimeout(() => {
                 trigger.tooltip('hide').attr('data-original-title', originalTitle);
             }, 2000);
             e.clearSelection();
         });
 
-        clipboard.on('error', function (e) {
-            const trigger = $(e.trigger);
-            const originalTitle = trigger.attr('data-original-title');
-            trigger.attr('data-original-title', 'Press Ctrl+C to copy').tooltip('show');
-            setTimeout(function () {
-                trigger.tooltip('hide').attr('data-original-title', originalTitle);
-            }, 2000);
-        });
-
-
-        elements.clearBtn.on('click', function () {
+        elements.clearBtn.on('click', () => {
             elements.editor.setValue('');
             elements.output.html(outputPlaceholder).removeAttr('data-clipboard-text');
             elements.editor.focus();
@@ -482,7 +458,6 @@
         elements.undoBtn.on('click', () => elements.editor.undo());
         elements.redoBtn.on('click', () => elements.editor.redo());
 
-        // Initial state
         elements.output.html(outputPlaceholder);
     });
 </script>
