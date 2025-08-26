@@ -1,0 +1,1232 @@
+
+I have a web project with the following files:
+
+
+Filename: `main/java/com/github/clickhouse/App.java`
+Content:
+```
+package com.github.clickhouse;
+
+import com.github.clickhouse.format.CommandLineSqlFormatter;
+import com.github.clickhouse.handler.FormattingHandler;
+import com.google.inject.Guice;
+import com.google.inject.Inject;
+import com.google.inject.Injector;
+import com.google.inject.Singleton;
+import com.google.inject.name.Named;
+import io.netty.util.internal.logging.InternalLoggerFactory;
+import io.netty.util.internal.logging.Slf4JLoggerFactory;
+import io.vertx.core.AbstractVerticle;
+import io.vertx.core.Promise;
+import io.vertx.core.Vertx;
+import io.vertx.core.VertxOptions;
+import io.vertx.core.http.HttpServer;
+import io.vertx.core.http.HttpServerOptions;
+import io.vertx.core.logging.SLF4JLogDelegateFactory;
+import io.vertx.ext.web.Router;
+import io.vertx.ext.web.handler.BodyHandler;
+import io.vertx.ext.web.handler.StaticHandler;
+import lombok.extern.slf4j.Slf4j;
+
+@Singleton
+@Slf4j
+public final class App extends AbstractVerticle {
+
+  private static final int DEFAULT_PORT = 7353;
+
+  static {
+    System.setProperty(
+        "vertx.logger-delegate-factory-class-name", SLF4JLogDelegateFactory.class.getName());
+    InternalLoggerFactory.setDefaultFactory(Slf4JLoggerFactory.INSTANCE);
+  }
+
+  private final FormattingHandler formattingHandler;
+  private int port = DEFAULT_PORT;
+  private HttpServer httpServer;
+
+  @Inject
+  public App(FormattingHandler formattingHandler) {
+    this.formattingHandler = formattingHandler;
+  }
+
+  public static void main(String[] args) {
+    if (CommandLineSqlFormatter.isCommandAvailable()) {
+      log.info("clickhouse-format is available");
+    } else {
+      log.error("clickhouse-format is not available");
+      System.exit(1);
+    }
+    Vertx vertx =
+        Vertx.vertx(
+            new VertxOptions()
+                .setPreferNativeTransport(true)
+                .setWorkerPoolSize(
+                    Math.min(20, 2 * Runtime.getRuntime().availableProcessors() + 1)));
+    Injector injector = Guice.createInjector(new AppModule(vertx));
+    App app = injector.getInstance(App.class);
+    vertx.deployVerticle(
+        app,
+        ar -> {
+          if (ar.succeeded()) {
+            String id = ar.result();
+            log.info("Deploy verticle successfully: {}", id);
+            Runtime.getRuntime().addShutdownHook(new Thread(() -> vertx.undeploy(id)));
+          } else {
+            log.error("Deploy with unexpected exception: ", ar.cause());
+          }
+        });
+  }
+
+  @Inject(optional = true)
+  public void setPort(@Named("SERVER_PORT") int port) {
+    this.port = port;
+  }
+
+  @Override
+  public void start(Promise<Void> startPromise) throws Exception {
+    Router router = Router.router(vertx);
+    router.get("/").handler(ctx -> ctx.reroute("/static/index.html"));
+    router.route("/static/*").handler(StaticHandler.create("webroot").setCachingEnabled(true));
+    router
+        .post("/api/format")
+        .handler(BodyHandler.create(false).setBodyLimit(3 * 1024 * 1024))
+        .handler(formattingHandler);
+    router
+        .route("/health")
+        .handler(
+            ctx -> ctx.response().setStatusCode(200).end("time=" + System.currentTimeMillis()));
+    HttpServer httpServer =
+        vertx.createHttpServer(
+            new HttpServerOptions().setTcpNoDelay(true).setTcpFastOpen(true).setTcpQuickAck(true));
+    httpServer.requestHandler(router);
+    httpServer.listen(
+        port,
+        ar -> {
+          if (ar.succeeded()) {
+            log.info("Start HTTP server listening on port: {}", ar.result().actualPort());
+            App.this.httpServer = ar.result();
+            startPromise.tryComplete();
+          } else {
+            log.error("Start HTTP server with unexpected exception: ", ar.cause());
+            startPromise.tryFail(ar.cause());
+          }
+        });
+  }
+
+  @Override
+  public void stop(Promise<Void> stopPromise) throws Exception {
+    if (httpServer != null) {
+      httpServer.close(stopPromise);
+    } else {
+      stopPromise.tryComplete();
+    }
+  }
+}
+```
+
+----------
+Filename: `main/java/com/github/clickhouse/AppModule.java`
+Content:
+```
+package com.github.clickhouse;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.inject.AbstractModule;
+import com.google.inject.name.Names;
+import io.vertx.core.Vertx;
+import lombok.NonNull;
+
+final class AppModule extends AbstractModule {
+
+  private final Vertx vertx;
+
+  AppModule(@NonNull Vertx vertx) {
+    this.vertx = vertx;
+  }
+
+  @Override
+  protected void configure() {
+    Names.bindProperties(binder(), System.getenv());
+    bind(ObjectMapper.class).toInstance(new ObjectMapper());
+    bind(Vertx.class).toInstance(vertx);
+  }
+}
+```
+
+----------
+Filename: `main/java/com/github/clickhouse/format/CommandLineSqlFormatter.java`
+Content:
+```
+package com.github.clickhouse.format;
+
+import com.google.common.collect.Lists;
+import com.google.common.io.ByteStreams;
+import com.google.inject.Inject;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufOutputStream;
+import io.vertx.core.Future;
+import io.vertx.core.Vertx;
+import io.vertx.core.buffer.Buffer;
+import io.vertx.core.buffer.impl.VertxByteBufAllocator;
+import java.io.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import lombok.NonNull;
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
+public final class CommandLineSqlFormatter {
+  private static final File CLICKHOUSE_HOME = initClickhouseHome();
+  private static final String BIN_NAME = "clickhouse-format";
+  private static final int MAX_CONCURRENT_FORMATTING = 10;
+  private static final int TIMEOUT_SECONDS = 30;
+
+  private final AtomicInteger concurrentCount = new AtomicInteger(0);
+  private final Vertx vertx;
+
+  @Inject
+  public CommandLineSqlFormatter(Vertx vertx) {
+    this.vertx = vertx;
+  }
+
+  private static File initClickhouseHome() {
+    String clickhouseHome = System.getenv("CLICKHOUSE_HOME");
+    if (clickhouseHome != null && !clickhouseHome.isEmpty()) {
+      File clickhouseHomeFile = new File(clickhouseHome);
+      if (clickhouseHomeFile.exists() && clickhouseHomeFile.isDirectory()) {
+        log.info("CLICKHOUSE_HOME is set to \"{}\".", clickhouseHome);
+        return clickhouseHomeFile;
+      }
+    }
+    return null;
+  }
+
+  private static Buffer inputStreamToBuffer(InputStream inputStream) throws IOException {
+    ByteBuf byteBuf = VertxByteBufAllocator.DEFAULT.heapBuffer();
+    try (ByteBufOutputStream outputStream = new ByteBufOutputStream(byteBuf)) {
+      ByteStreams.copy(inputStream, outputStream);
+      return Buffer.buffer(byteBuf);
+    }
+  }
+
+  private static ProcessBuilder createProcessBuilder(List<String> command) {
+    ProcessBuilder processBuilder = new ProcessBuilder(command);
+    processBuilder.redirectErrorStream(false);
+    if (CLICKHOUSE_HOME != null) {
+      processBuilder.directory(CLICKHOUSE_HOME);
+    }
+    return processBuilder;
+  }
+
+  public static boolean isCommandAvailable() {
+    try {
+      Process process =
+          createProcessBuilder(Lists.newArrayList(BIN_NAME, "--query", "select 1")).start();
+      return process.waitFor() == 0;
+    } catch (Exception e) {
+      return false;
+    }
+  }
+
+  public Future<Buffer> format(@NonNull Buffer input, @NonNull Options options) {
+    if (concurrentCount.incrementAndGet() >= MAX_CONCURRENT_FORMATTING) {
+      concurrentCount.decrementAndGet();
+      return Future.failedFuture(new IllegalStateException("Too many concurrent formatting tasks"));
+    }
+    return vertx.executeBlocking(
+        promise -> {
+          try {
+            Buffer output = formatWithProcess(input, options);
+            promise.complete(output);
+          } catch (Exception e) {
+            promise.fail(e);
+          } finally {
+            concurrentCount.decrementAndGet();
+          }
+        },
+        false);
+  }
+
+  private Buffer formatWithProcess(@NonNull Buffer input, @NonNull Options options)
+      throws SqlFormatException, IOException, InterruptedException {
+    List<String> command = buildCommand(options);
+    Process process = createProcessBuilder(command).start();
+
+    try {
+      writeInput(process, input);
+      if (!process.waitFor(TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+        process.destroyForcibly();
+        throw new SqlFormatException(-1, Buffer.buffer("Process timeout"));
+      }
+
+      int exitCode = process.exitValue();
+      if (exitCode != 0) {
+        try (InputStream errorStream = process.getErrorStream()) {
+          throw new SqlFormatException(exitCode, inputStreamToBuffer(errorStream));
+        }
+      }
+
+      try (InputStream inputStream = process.getInputStream()) {
+        return inputStreamToBuffer(inputStream);
+      }
+    } finally {
+      process.destroyForcibly();
+    }
+  }
+
+  private void writeInput(Process process, Buffer input) throws IOException {
+    try (OutputStream outputStream = process.getOutputStream()) {
+      outputStream.write(input.getBytes());
+      outputStream.flush();
+    }
+  }
+
+  private List<String> buildCommand(Options options) {
+    List<String> command = new ArrayList<>();
+    command.add(BIN_NAME);
+    options.appendTo(command);
+    return command;
+  }
+}
+```
+
+----------
+Filename: `main/java/com/github/clickhouse/format/Options.java`
+Content:
+```
+package com.github.clickhouse.format;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.base.CaseFormat;
+import com.google.common.collect.ImmutableMap;
+import io.vertx.core.MultiMap;
+import java.io.Serializable;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
+import java.util.Collection;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+import lombok.Getter;
+import lombok.NonNull;
+import lombok.Setter;
+
+/**
+ *
+ *
+ * <pre>
+ * Allowed options:
+ *   --query arg                              query to format
+ *   -h [ --help ]                            produce help message
+ *   --comments                               keep comments in the output
+ *   --hilite                                 add syntax highlight with ANSI terminal escape sequences
+ *   --oneline                                format in single line
+ *   --max_line_length arg (=0)               format in single line queries with length less than specified
+ *   -q [ --quiet ]                           just check syntax, no output on success
+ *   -n [ --multiquery ]                      allow multiple queries in the same file
+ *   --obfuscate                              obfuscate instead of formatting
+ *   --backslash                              add a backslash at the end of each line of the formatted query
+ *   --allow_settings_after_format_in_insert  Allow SETTINGS after FORMAT, but note, that this is not always safe
+ *   --seed arg                               seed (arbitrary string) that determines the result of obfuscation
+ *   --max_query_size arg                     The maximum number of bytes of a query string parsed by the SQL parser. Data in the VALUES clause of INSERT
+ *                                            queries is processed by a separate stream parser (that consumes O(1) RAM) and not affected by this restriction.
+ *   --max_parser_depth arg                   Maximum parser depth (recursion depth of recursive descend parser).
+ *   </pre>
+ */
+@Getter
+@Setter
+@JsonIgnoreProperties(ignoreUnknown = true)
+public final class Options implements Serializable {
+
+  private static final Pattern ALLOWED_STRING_PATTERN = Pattern.compile("^[a-zA-Z0-9_\\-]+$");
+
+  private static final Map<String, Field> CACHED_FIELDS;
+  private static final long serialVersionUID = -1793995872382083833L;
+
+  static {
+    Map<String, Field> fields = new LinkedHashMap<>();
+    for (Field field : Options.class.getDeclaredFields()) {
+      if (Modifier.isStatic(field.getModifiers())) {
+        continue;
+      }
+      field.setAccessible(true);
+      fields.put(field.getName(), field);
+      if (field.isAnnotationPresent(JsonProperty.class)) {
+        fields.put(field.getAnnotation(JsonProperty.class).value(), field);
+      }
+    }
+    CACHED_FIELDS = ImmutableMap.copyOf(fields);
+  }
+
+  private Boolean hilite;
+  private Boolean comments;
+  private Boolean oneline;
+  private Integer maxLineLength;
+  private Boolean multiquery;
+  private Boolean backslash;
+  private Boolean allowSettingsAfterFormatInInsert;
+  private Boolean obfuscate;
+  private String seed;
+  private Integer maxQuerySize;
+  private Integer maxParserDepth;
+
+  public static Options fromMultiMap(
+      @NonNull ObjectMapper objectMapper, @NonNull MultiMap multiMap) {
+    Options options = new Options();
+    Map<String, List<String>> tempMap =
+        multiMap.entries().stream()
+            .filter(entry -> CACHED_FIELDS.containsKey(entry.getKey()))
+            .collect(
+                Collectors.groupingBy(
+                    Map.Entry::getKey,
+                    Collectors.mapping(Map.Entry::getValue, Collectors.toList())));
+    for (Map.Entry<String, List<String>> entry : tempMap.entrySet()) {
+      try {
+        Object value;
+        if (entry.getValue().size() == 1) {
+          value = entry.getValue().get(0);
+        } else {
+          value = entry.getValue();
+        }
+        Field field = CACHED_FIELDS.get(entry.getKey());
+        field.set(options, objectMapper.convertValue(value, field.getType()));
+      } catch (IllegalAccessException e) {
+        throw new RuntimeException(e);
+      }
+    }
+    return options;
+  }
+
+  private static String wrap(Object value) {
+    if (value instanceof String) {
+      String s = (String) value;
+      // avoid command line injection
+      if (ALLOWED_STRING_PATTERN.matcher(s).matches()) {
+        return s;
+      }
+      return "";
+    }
+    return value.toString();
+  }
+
+  public <T extends Collection<String>> T appendTo(@NonNull T command) {
+    for (Map.Entry<String, Field> entry : CACHED_FIELDS.entrySet()) {
+      try {
+        Object value = entry.getValue().get(this);
+        if (value == null || Boolean.FALSE.equals(value)) {
+          continue;
+        }
+        command.add("--" + CaseFormat.LOWER_CAMEL.to(CaseFormat.LOWER_UNDERSCORE, entry.getKey()));
+        if (value instanceof Boolean) {
+          continue;
+        }
+        command.add(wrap(value));
+      } catch (IllegalAccessException e) {
+        throw new RuntimeException(e);
+      }
+    }
+    return command;
+  }
+}
+```
+
+----------
+Filename: `main/java/com/github/clickhouse/format/SqlFormatException.java`
+Content:
+```
+package com.github.clickhouse.format;
+
+import io.vertx.core.buffer.Buffer;
+import lombok.Getter;
+
+public class SqlFormatException extends Exception {
+
+  private static final long serialVersionUID = 7722426406847061018L;
+  @Getter private final int code;
+  @Getter private final Buffer stderr;
+
+  public SqlFormatException(int code, Buffer stderr) {
+    super(null, null, false, false);
+    this.code = code;
+    this.stderr = stderr;
+  }
+}
+```
+
+----------
+Filename: `main/java/com/github/clickhouse/handler/FormattingHandler.java`
+Content:
+```
+package com.github.clickhouse.handler;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.github.clickhouse.format.CommandLineSqlFormatter;
+import com.github.clickhouse.format.Options;
+import com.github.clickhouse.format.SqlFormatException;
+import com.google.common.net.MediaType;
+import com.google.inject.Inject;
+import com.google.inject.Singleton;
+import io.netty.handler.codec.http.HttpHeaderNames;
+import io.netty.handler.codec.http.HttpResponseStatus;
+import io.netty.util.AsciiString;
+import io.vertx.core.AsyncResult;
+import io.vertx.core.Handler;
+import io.vertx.core.buffer.Buffer;
+import io.vertx.core.http.HttpServerRequest;
+import io.vertx.core.http.HttpServerResponse;
+import io.vertx.ext.web.RoutingContext;
+
+@Singleton
+public final class FormattingHandler implements Handler<RoutingContext> {
+
+  private static final CharSequence TEXT_PLAIN =
+      AsciiString.of(MediaType.PLAIN_TEXT_UTF_8.toString());
+  private final CommandLineSqlFormatter formatter;
+  private final ObjectMapper objectMapper;
+
+  @Inject
+  public FormattingHandler(ObjectMapper objectMapper, CommandLineSqlFormatter formatter) {
+    this.objectMapper = objectMapper;
+    this.formatter = formatter;
+  }
+
+  private static void endWithCodeAndMsg(
+      HttpServerResponse response, HttpResponseStatus status, String msg) {
+    response
+        .putHeader(HttpHeaderNames.CONTENT_TYPE, TEXT_PLAIN)
+        .setStatusCode(status.code())
+        .setStatusMessage(status.reasonPhrase())
+        .end(msg);
+  }
+
+  @Override
+  public void handle(RoutingContext context) {
+    HttpServerRequest request = context.request();
+    HttpServerResponse response = context.response();
+    Options options;
+    try {
+      options = Options.fromMultiMap(objectMapper, request.params());
+    } catch (Exception e) {
+      endWithCodeAndMsg(response, HttpResponseStatus.BAD_REQUEST, e.getMessage());
+      return;
+    }
+    Buffer body = context.body().buffer();
+    if (body == null || body.length() == 0) {
+      endWithCodeAndMsg(response, HttpResponseStatus.BAD_REQUEST, "Empty body");
+      return;
+    }
+
+    if (body.length() > 1024 * 1024) {
+      endWithCodeAndMsg(response, HttpResponseStatus.BAD_REQUEST, "Body too large");
+      return;
+    }
+
+    formatter
+        .format(body, options)
+        .onComplete(
+            (AsyncResult<Buffer> result) -> {
+              if (result.succeeded()) {
+                response
+                    .setStatusCode(HttpResponseStatus.OK.code())
+                    .putHeader(HttpHeaderNames.CONTENT_TYPE, TEXT_PLAIN)
+                    .end(result.result());
+              } else {
+                Throwable cause = result.cause();
+                if (cause instanceof SqlFormatException) {
+                  response
+                      .setStatusCode(HttpResponseStatus.NOT_ACCEPTABLE.code())
+                      .putHeader(HttpHeaderNames.CONTENT_TYPE, TEXT_PLAIN)
+                      .end(((SqlFormatException) cause).getStderr());
+                } else {
+                  endWithCodeAndMsg(
+                      response, HttpResponseStatus.INTERNAL_SERVER_ERROR, cause.getMessage());
+                }
+              }
+            });
+  }
+}
+```
+
+----------
+Filename: `main/resources/webroot/canvas-fingerprint.html`
+Content:
+```
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta content="*" http-equiv="Access-Control-Allow-Origin"/>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+</head>
+<body>
+<script type="application/javascript">
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    // Text with lowercase/uppercase/punctuation symbols
+    const txt = "BrowserLeaks,com <canvas> 1.0";
+    ctx.textBaseline = "top";
+    // The most common type
+    ctx.font = "14px 'Arial'";
+    ctx.textBaseline = "alphabetic";
+    ctx.fillStyle = "#f60";
+    ctx.fillRect(125, 1, 62, 20);
+    // Some tricks for color mixing to increase the difference in rendering
+    ctx.fillStyle = "#069";
+    ctx.fillText(txt, 2, 15);
+    ctx.fillStyle = "rgba(102, 204, 0, 0.7)";
+    ctx.fillText(txt, 4, 17);
+
+    const canvasData = canvas.toDataURL();
+
+    canvas.remove();
+    const hashBrowser = val =>
+        crypto.subtle
+            .digest('SHA-256', new TextEncoder('utf-8').encode(val))
+            .then(h => {
+                let hexes = [],
+                    view = new DataView(h);
+                for (let i = 0; i < view.byteLength; i += 4)
+                    hexes.push(('00000000' + view.getUint32(i).toString(16)).slice(-8));
+                return hexes.join('');
+            });
+    hashBrowser(canvasData).then(
+        hash => {
+            const p = document.createElement('p');
+            p.innerText = hash;
+            document.body.append(p);
+        }
+    )
+</script>
+</body>
+</html>
+```
+
+----------
+Filename: `main/resources/webroot/index.html`
+Content:
+```
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-CCS6CPTZW9"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+
+        function gtag() {
+            dataLayer.push(arguments);
+        }
+
+        gtag('js', new Date());
+
+        gtag('config', 'G-CCS6CPTZW9');
+    </script>
+    <!--<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3063309143016305"
+            crossorigin="anonymous"></script>
+    <script type="text/javascript" data-cmp-ab="1"
+            src="https://cdn.consentmanager.net/delivery/autoblocking/cf704ffdf1a25.js"
+            data-cmp-host="c.delivery.consentmanager.net" data-cmp-cdn="cdn.consentmanager.net"
+            data-cmp-codesrc="16"></script>-->
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <meta name="description"
+          content="Free online clickhouse sql formatter, support highlighting, compatible with clickhouse-format"/>
+    <meta name="keywords" content="clickhouse, sql, formatter, highlight, clickhouse-format"/>
+    <title>Online Clickhouse SQL Formatter</title>
+    <link rel="icon" type="image/x-icon" href="https://clickhouse.com/docs/img/docs_favicon.ico">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css"/>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/4.3.1/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/codemirror.min.css"
+          integrity="sha512-uf06llspW44/LZpHzHT6qBOIVODjWtv4MxCricRxkzvopAlSWnTf6hpZTFxuuZcuNE9CBQhqE0Seu1CoRk84nQ=="
+          crossorigin="anonymous" referrerpolicy="no-referrer"/>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/theme/material.min.css"
+          integrity="sha512-jA21084nir3cN96YuzJ1DbtDn30kxhxqQToAzCEGZcuRAswWfYirpUu8HVm8wRNoWDCYtA4iavd2Rb1bQSLv7g=="
+          crossorigin="anonymous" referrerpolicy="no-referrer"/>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: #f8f9fa; /* Light background for the page */
+            padding-top: 1rem; /* Add some space at the top */
+        }
+
+        .main-container {
+            padding-left: 20px;
+            padding-right: 20px;
+            padding-bottom: 20px; /* Add padding at the bottom */
+        }
+
+        h3 {
+            color: #343a40; /* Darker heading color */
+            border-bottom: 1px solid #dee2e6; /* Add a subtle separator line below heading */
+        }
+
+        /* Control Panel Styling */
+        .control-panel {
+            display: flex;
+            flex-wrap: wrap; /* Allow items to wrap on smaller screens */
+            align-items: center;
+            gap: 0.5rem; /* Space between buttons/dropdown */
+            background-color: #ffffff; /* White background for the panel */
+            padding: 0.75rem 1rem; /* More padding */
+            border-radius: 0.25rem; /* Rounded corners */
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1); /* Subtle shadow */
+            margin-bottom: 1rem; /* Space below the control panel */
+        }
+
+        .control-panel .btn {
+            /* Optional: Adjust button padding or size if needed */
+        }
+
+        .dropdown-menu {
+            max-height: 400px; /* Limit dropdown height */
+            overflow-y: auto; /* Add scroll if options exceed max height */
+        }
+
+        /* Spacing within the dropdown form */
+        .dropdown-menu form .form-check {
+            margin-bottom: 0.5rem; /* Space below checkboxes */
+        }
+
+        .dropdown-menu form .form-check:last-of-type {
+            margin-bottom: 0.75rem; /* More space before divider/inputs */
+        }
+
+        .dropdown-menu form .form-group {
+            margin-bottom: 0.75rem; /* Space below input groups */
+        }
+
+        .dropdown-menu form .form-group:last-of-type {
+            margin-bottom: 0.25rem; /* Less space at the very bottom */
+        }
+
+        .dropdown-menu form label {
+            font-size: 0.9em; /* Slightly smaller labels */
+            margin-bottom: 0.25rem; /* Space between label and input/check */
+        }
+
+        /* SQL Editor Areas */
+        .sql-areas {
+            /* The row itself doesn't need much styling, columns handle it */
+        }
+
+        /* Style the CodeMirror editor */
+        .CodeMirror {
+            border: 1px solid #ced4da;
+            height: 70vh; /* Make editors take significant vertical space */
+            min-height: 300px; /* Minimum height */
+            font-size: 0.95em;
+            border-radius: 0.25rem;
+        }
+
+        /* Style the output area */
+        #sqlOutput {
+            border: 1px solid #ced4da;
+            height: 70vh; /* Match input editor height */
+            min-height: 300px; /* Minimum height */
+            background-color: #e9ecef; /* Slightly different background for output */
+            padding: 10px;
+            font-family: Consolas, "Courier New", monospace; /* Monospace font for SQL */
+            font-size: 0.95em;
+            overflow-y: auto; /* Scroll if content overflows */
+            white-space: pre-wrap; /* Preserve whitespace and wrap */
+            word-break: break-all; /* Break long lines */
+            border-radius: 0.25rem;
+            line-height: 1.4;
+        }
+
+        /* Styling for non-highlighted output within the div */
+        #sqlOutput code {
+            display: block; /* Ensure code block takes full width */
+            white-space: pre-wrap; /* Inherit wrapping */
+            word-break: break-all; /* Inherit breaking */
+            color: #212529; /* Default text color */
+        }
+
+        /* Style error messages in output */
+        #sqlOutput p.text-danger {
+            margin: 0; /* Remove default paragraph margin */
+            font-weight: bold;
+        }
+
+        /* Style the loading spinner container */
+        #sqlOutput .d-flex {
+            height: 100%; /* Center spinner vertically */
+            align-items: center;
+        }
+
+        /* Separator */
+        hr {
+            margin-top: 1rem;
+            margin-bottom: 1.5rem; /* Add more space around the separator */
+        }
+
+        /* Ensure tooltips are visible */
+        .tooltip-inner {
+            max-width: 250px; /* Prevent tooltips from becoming too wide */
+            background-color: #343a40; /* Darker tooltip background */
+            color: #ffffff; /* White text */
+        }
+
+        .tooltip.bs-tooltip-auto[x-placement^=bottom] .arrow::before,
+        .tooltip.bs-tooltip-bottom .arrow::before {
+            border-bottom-color: #343a40; /* Match arrow color */
+        }
+
+        .tooltip.bs-tooltip-auto[x-placement^=top] .arrow::before,
+        .tooltip.bs-tooltip-top .arrow::before {
+            border-top-color: #343a40;
+        }
+
+        .tooltip.bs-tooltip-auto[x-placement^=right] .arrow::before,
+        .tooltip.bs-tooltip-right .arrow::before {
+            border-right-color: #343a40;
+        }
+
+        .tooltip.bs-tooltip-auto[x-placement^=left] .arrow::before,
+        .tooltip.bs-tooltip-left .arrow::before {
+            border-left-color: #343a40;
+        }
+
+        /* Minor adjustment for mobile */
+        @media (max-width: 767.98px) {
+            .CodeMirror, #sqlOutput {
+                height: 40vh; /* Slightly reduce height on mobile */
+                min-height: 250px;
+            }
+
+            .control-panel {
+                padding: 0.5rem 0.75rem; /* Less padding on mobile */
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="container-fluid main-container">
+    <h3 class="pb-2 mb-3">Online Clickhouse SQL Formatter</h3> <!-- Adjusted bottom margin -->
+
+    <!-- Control Panel Row -->
+    <div class="row">
+        <div class="col-12">
+            <div class="control-panel py-1"> <!-- Added padding and flex container -->
+                <!-- Buttons and Dropdown (removed form-group wrappers, using gap now) -->
+                <button class="btn btn-outline-secondary" type="button" id="formatBtn" data-toggle="tooltip"
+                        data-placement="bottom" title="Run Format">
+                    <i class="fa fa-play" aria-hidden="true"></i>
+                </button>
+                <button class="btn btn-outline-secondary" type="button" id="copyBtn" data-clipboard-target="#sqlOutput"
+                        data-toggle="tooltip" data-placement="bottom" title="Copy to Clipboard">
+                    <i class="fa fa-clipboard" aria-hidden="true"></i>
+                </button>
+                <button class="btn btn-outline-secondary" type="button" id="clearBtn" data-toggle="tooltip"
+                        data-placement="bottom" title="Clear">
+                    <i class="fa fa-trash" aria-hidden="true"></i>
+                </button>
+                <button class="btn btn-outline-secondary" type="button" id="undoBtn" data-toggle="tooltip"
+                        data-placement="bottom" title="Undo">
+                    <i class="fa fa-undo" aria-hidden="true"></i>
+                </button>
+                <button class="btn btn-outline-secondary" type="button" id="redoBtn" data-toggle="tooltip"
+                        data-placement="bottom" title="Redo">
+                    <i class="fa fa-repeat" aria-hidden="true"></i>
+                </button>
+                <a href="https://clickhouse.com/docs/en/sql-reference" class="btn btn-outline-secondary" target="_blank"
+                   data-toggle="tooltip" data-placement="bottom" title="SQL Reference">
+                    <i class="fa fa-book"></i>
+                </a>
+
+                <!-- Dropdown -->
+                <div class="dropdown"> <!-- Keep dropdown wrapper -->
+                    <button class="btn btn-outline-secondary dropdown-toggle" type="button" id="dropdownMenu2"
+                            data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                        <i class="fa fa-bars" aria-hidden="true"></i> Options
+                    </button>
+                    <div class="dropdown-menu" aria-labelledby="dropdownMenu2">
+                        <!-- Using px/py inside form is okay if dropdown-menu padding isn't sufficient -->
+                        <form class="px-3 py-2">
+                            <!-- Form Check examples (Apply similar structure to all) -->
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input" id="autoFormatCheck">
+                                <label class="form-check-label" for="autoFormatCheck" data-toggle="tooltip"
+                                       data-placement="bottom" title="Enable auto format">Auto Format</label>
+                            </div>
+                            <div class="form-check">
+                                <input type="checkbox" checked="checked" class="form-check-input" id="hiliteCheck">
+                                <label class="form-check-label" for="hiliteCheck" data-toggle="tooltip"
+                                       data-placement="bottom"
+                                       title="Add syntax highlight with ANSI terminal escape sequences">Highlight
+                                    (ANSI)</label>
+                            </div>
+                            <div class="form-check">
+                                <input type="checkbox" checked="checked" class="form-check-input" id="commentsCheck">
+                                <label class="form-check-label" for="commentsCheck" data-toggle="tooltip"
+                                       data-placement="bottom"
+                                       title="Keep comments in the output">Keep Comments</label>
+                            </div>
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input" id="onelineCheck">
+                                <label class="form-check-label" for="onelineCheck" data-toggle="tooltip"
+                                       data-placement="bottom"
+                                       title="Format in single line">Single Line</label>
+                            </div>
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input" id="multiqueryCheck">
+                                <label class="form-check-label" for="multiqueryCheck" data-toggle="tooltip"
+                                       data-placement="bottom"
+                                       title="Allow multiple queries in the same file">Allow Multi-query</label>
+                            </div>
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input" id="backslashCheck">
+                                <label class="form-check-label" for="backslashCheck" data-toggle="tooltip"
+                                       data-placement="bottom"
+                                       title="Add a backslash at the end of each line of the formatted query">Add
+                                    Backslashes</label>
+                            </div>
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input"
+                                       id="allowSettingsAfterFormatInInsertCheck">
+                                <label class="form-check-label"
+                                       for="allowSettingsAfterFormatInInsertCheck" data-toggle="tooltip"
+                                       data-placement="bottom"
+                                       title="Allow SETTINGS after FORMAT, but note, that this is not always safe">Allow
+                                    SETTINGS after FORMAT</label>
+                            </div>
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input" id="obfuscateCheck">
+                                <label class="form-check-label" for="obfuscateCheck" data-toggle="tooltip"
+                                       data-placement="bottom"
+                                       title="Obfuscate instead of formatting">Obfuscate</label>
+                            </div>
+
+                            <!-- Form Group examples (Apply similar structure to all) -->
+                            <div class="dropdown-divider"></div> <!-- Separator -->
+                            <div class="form-group">
+                                <label for="maxLineLengthInput" data-toggle="tooltip" data-placement="bottom"
+                                       title="Format in single line queries with length less than specified">Max Line
+                                    Length:</label>
+                                <input type="number" class="form-control" id="maxLineLengthInput"
+                                       placeholder="e.g., 120">
+                            </div>
+                            <div class="form-group">
+                                <label for="seedInput" data-toggle="tooltip" data-placement="bottom"
+                                       title="Seed (arbitrary string) that determines the result of obfuscation">Obfuscation
+                                    Seed:</label>
+                                <input type="text" class="form-control" id="seedInput">
+                            </div>
+                            <div class="form-group">
+                                <label for="maxQuerySizeInput" data-toggle="tooltip" data-placement="bottom"
+                                       title="The maximum number of bytes of a query string parsed by the SQL parser.">Max
+                                    Query Size (bytes):</label>
+                                <input type="number" class="form-control" id="maxQuerySizeInput"
+                                       placeholder="e.g., 262144">
+                            </div>
+                            <div class="form-group">
+                                <label for="maxParserDepthInput" data-toggle="tooltip" data-placement="top"
+                                       title="Maximum parser depth (recursion depth of recursive descend parser).">Max
+                                    Parser Depth:</label>
+                                <input type="number" class="form-control" id="maxParserDepthInput"
+                                       placeholder="e.g., 1000">
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <hr> <!-- Separator -->
+
+    <!-- SQL Input/Output Row -->
+    <div class="row sql-areas">
+        <div class="col-md-6 mb-3 mb-md-0"> <!-- Add bottom margin on mobile -->
+            <label for="sqlInput" class="sr-only">Source SQL Input</label> <!-- Screen reader label -->
+            <textarea id="sqlInput" class="sql-editor"></textarea>
+            <!-- Added class -->
+        </div>
+        <div class="col-md-6">
+            <label for="sqlOutput" class="sr-only">Formatted SQL Output</label> <!-- Screen reader label -->
+            <div id="sqlOutput" class="sql-editor"></div> <!-- Added class -->
+        </div>
+    </div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.16.1/umd/popper.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/4.6.2/js/bootstrap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/clipboard.js/2.0.11/clipboard.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/ansi_up@5.1.0/ansi_up.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/codemirror.min.js"
+        integrity="sha512-6cPYokihlrofMNApz7OXVQNObWjLiKGIBBb7+UB+AuMiRCLKmFKgrwms21sHq3bdFFZWpfHYRJBJvMFMPj1S9g=="
+        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script type="text/javascript">
+    $(function () {
+
+        // Initialize tooltips OUTSIDE the dropdown (keep simple or add container:body)
+        $('.control-panel > [data-toggle="tooltip"]').tooltip({
+            container: 'body' // Good practice anyway
+        });
+        // Or if the simple version worked fine for these:
+        // $('.control-panel > [data-toggle="tooltip"]').tooltip();
+
+
+        // Initialize tooltips INSIDE the dropdown SEPARATELY with delay and container
+        $('.dropdown-menu [data-toggle="tooltip"]').tooltip({
+            container: 'body', // Still recommended for dropdowns
+            delay: {"show": 100, "hide": 100} // Add delay (especially for hide)
+            // You can adjust the hide delay (e.g., 50, 150)
+        });
+
+
+        const elements = Object.freeze({
+            editor: CodeMirror.fromTextArea(document.getElementById("sqlInput"), {
+                lineNumbers: true,             // Keep: Essential for referencing lines
+                mode: "text/x-sql",            // Use generic SQL mode (often better supported) or stick with "text/x-clickhouse" if specific features are needed and available
+                theme: "material",             // Keep: Matches the included theme CSS
+                matchBrackets: true,           // Keep: Helps match parentheses, brackets
+                //indentUnit: 4,               // Keep: Standard indentation size (adjust if preferred) - This is often inferred correctly with smartIndent
+                smartIndent: true,             // Keep: Enables context-aware indentation
+                indentWithTabs: false,         // Added: Use spaces instead of tabs for indentation
+                tabSize: 4,                    // Added: Ensure tab key inserts 4 spaces (aligns with indentUnit)
+                autoCloseBrackets: true,       // Added: Automatically close brackets and quotes ( '(', '[', '{', "'", '"' )
+                styleActiveLine: true,         // Added: Highlights the entire line the cursor is on
+                lineWrapping: true,            // Added: Wraps long lines instead of requiring horizontal scrolling
+                placeholder: "Paste your ClickHouse SQL here...", // Added: Use CodeMirror's placeholder instead of the textarea's (often renders better)
+            }),
+            output: $('#sqlOutput'),
+            hilite: $('#hiliteCheck'),
+            oneline: $('#onelineCheck'),
+            multiquery: $('#multiqueryCheck'),
+            backslash: $('#backslashCheck'),
+            allowSettingsAfterFormatInInsert: $('#allowSettingsAfterFormatInInsertCheck'),
+            obfuscate: $('#obfuscateCheck'),
+            comments: $('#commentsCheck'),
+            seed: $('#seedInput'),
+            maxQuerySize: $('#maxQuerySizeInput'),
+            maxParserDepth: $('#maxParserDepthInput'),
+            maxLineLength: $('#maxLineLengthInput'),
+            autoFormat: $('#autoFormatCheck'),
+            formatBtn: $('#formatBtn'),
+            clearBtn: $('#clearBtn'),
+            undoBtn: $('#undoBtn'),
+            redoBtn: $('#redoBtn'),
+            copyBtn: $('#copyBtn'),
+        });
+
+
+        const getOptions = function () {
+            const obj = {
+                hilite: elements.hilite.prop('checked'),
+                oneline: elements.oneline.prop('checked'),
+                comments: elements.comments.prop('checked'),
+                multiquery: elements.multiquery.prop('checked'),
+                backslash: elements.backslash.prop('checked'),
+                allowSettingsAfterFormatInInsert: elements.allowSettingsAfterFormatInInsert.prop('checked'),
+                obfuscate: elements.obfuscate.prop('checked'),
+                seed: elements.seed.val(),
+                maxQuerySize: elements.maxQuerySize.val(),
+                maxParserDepth: elements.maxParserDepth.val(),
+                maxLineLength: elements.maxLineLength.val()
+            };
+            for (let key in obj) {
+                const val = obj[key];
+                if (val === '' || val === null || val === undefined || val === false) {
+                    delete obj[key];
+                }
+            }
+            return obj;
+        };
+
+        const createHighlighter = function () {
+            if (window.AnsiUp) {
+                const ansiUp = new AnsiUp();
+                return function (text) {
+                    return ansiUp.ansi_to_html(text);
+                };
+            } else {
+                console.warn('AnsiUp not available!');
+                return function (text) {
+                    return text;
+                };
+            }
+        };
+
+        const isNotBlank = function (str) {
+            return (typeof str === 'string' || str instanceof String)
+                && str.length > 0 && str.trim().length > 0;
+        };
+
+
+        const highlighter = createHighlighter();
+        const formatRequest = function () {
+            const sql = elements.editor.getValue();
+            if (!isNotBlank(sql)) {
+                return;
+            }
+            elements.output.html('<div class="d-flex justify-content-center"><div class="spinner-border text-info" role="status"><span class="sr-only">Loading...</span></div></div>');
+            const options = getOptions();
+            $.ajax({
+                url: 'api/format?' + $.param(options),
+                method: 'POST',
+                contentType: "text/plain; charset=utf-8",
+                data: sql,
+                dataType: 'text'
+            }).done(function (data) {
+                gtag('event', 'format_success', {
+                    'inputLength': sql.length,
+                    'outputLength': data.length
+                });
+                if (typeof data === 'string' || data instanceof String) {
+                    if (options.hilite) {
+                        elements.output.html(highlighter(data));
+                    } else {
+                        elements.output.html(`<code>${data}</code>`);
+                    }
+                }
+            }).fail(function (xhr, status, error) {
+                gtag('event', 'format_error', {
+                    'inputLength': sql.length,
+                    'status': status,
+                    'error': error
+                });
+                elements.output.html(`<p class="text-danger">${xhr.responseText}</p>`);
+            });
+        };
+
+
+        let timer = null;
+        elements.editor.on('change', function () {
+            if (timer) {
+                clearTimeout(timer);
+                timer = null;
+            }
+            if (elements.autoFormat.prop('checked')) {
+                timer = setTimeout(formatRequest, 200);
+            }
+        });
+        elements.formatBtn.on('click', formatRequest);
+
+        const initClipboard = function () {
+            if (window.ClipboardJS) {
+                new ClipboardJS('#copyBtn');
+            } else {
+                console.warn('Clipboard not available!');
+            }
+        };
+        initClipboard();
+
+        elements.clearBtn.on('click', function () {
+            elements.editor.setValue('');
+            elements.output.empty();
+        });
+        elements.undoBtn.on('click', function () {
+            elements.editor.undo();
+        });
+        elements.redoBtn.on('click', function () {
+            elements.editor.redo();
+        });
+    });
+</script>
+</body>
+</html>
+```
+
+----------
+Filename: `test/java/com/github/clickhouse/format/OptionsTest.java`
+Content:
+```
+package com.github.clickhouse.format;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.base.Joiner;
+import io.vertx.core.MultiMap;
+import org.junit.Test;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
+
+public class OptionsTest {
+
+  @Test
+  public void testFromMultiMap() {
+    MultiMap multiMap = MultiMap.caseInsensitiveMultiMap();
+    multiMap.add("hilite", "true");
+    multiMap.add("oneline", "true");
+    multiMap.add("multiquery", "false");
+
+    multiMap.add("seed", "HelloWorld");
+
+    multiMap.add("allowSettingsAfterFormatInInsert", "false");
+    multiMap.add("maxParserDepth", "9999");
+
+    Options options = Options.fromMultiMap(new ObjectMapper(), multiMap);
+
+    assertEquals(Boolean.TRUE, options.getHilite());
+    assertEquals(Boolean.TRUE, options.getOneline());
+    assertEquals(Boolean.FALSE, options.getMultiquery());
+    assertEquals(Boolean.FALSE, options.getAllowSettingsAfterFormatInInsert());
+    assertEquals(Integer.valueOf(9999), options.getMaxParserDepth());
+    assertEquals("HelloWorld", options.getSeed());
+
+    assertNull(options.getBackslash());
+    assertNull(options.getObfuscate());
+    assertNull(options.getMaxQuerySize());
+  }
+
+  @Test
+  public void testAppendTo() {
+    Options options = new Options();
+    options.setHilite(true);
+    options.setOneline(true);
+    options.setMultiquery(false);
+
+    options.setSeed("HelloWorld");
+    options.setMaxQuerySize(100);
+
+    assertEquals(
+        Arrays.asList("--hilite", "--oneline", "--seed", "HelloWorld", "--max_query_size", "100"),
+        options.appendTo(new ArrayList<>()));
+  }
+
+  @Test
+  public void split() {
+    String s =
+        "AFTER | ALIAS | ALL | ALTER | AND | ANTI | ANY | ARRAY | AS | ASCENDING | ASOF | AST | ASYNC | ATTACH | BETWEEN | BOTH | BY | CASE\n"
+            + "    | CAST | CHECK | CLEAR | CLUSTER | CODEC | COLLATE | COLUMN | COMMENT | CONSTRAINT | CREATE | CROSS | CUBE | CURRENT | DATABASE\n"
+            + "    | DATABASES | DATE | DEDUPLICATE | DEFAULT | DELAY | DELETE | DESCRIBE | DESC | DESCENDING | DETACH | DICTIONARIES | DICTIONARY | DISK\n"
+            + "    | DISTINCT | DISTRIBUTED | DROP | ELSE | END | ENGINE | EVENTS | EXISTS | EXPLAIN | EXPRESSION | EXTRACT | FETCHES | FINAL | FIRST\n"
+            + "    | FLUSH | FOR | FOLLOWING | FOR | FORMAT | FREEZE | FROM | FULL | FUNCTION | GLOBAL | GRANULARITY | GROUP | HAVING | HIERARCHICAL | ID\n"
+            + "    | IF | ILIKE | IN | INDEX | INJECTIVE | INNER | INSERT | INTERVAL | INTO | IS | IS_OBJECT_ID | JOIN | JSON_FALSE | JSON_TRUE | KEY\n"
+            + "    | KILL | LAST | LAYOUT | LEADING | LEFT | LIFETIME | LIKE | LIMIT | LIVE | LOCAL | LOGS | MATERIALIZE | MATERIALIZED | MAX | MERGES\n"
+            + "    | MIN | MODIFY | MOVE | MUTATION | NO | NOT | NULLS | OFFSET | ON | OPTIMIZE | OR | ORDER | OUTER | OUTFILE | OVER | PARTITION\n"
+            + "    | POPULATE | PRECEDING | PREWHERE | PRIMARY | RANGE | RELOAD | REMOVE | RENAME | REPLACE | REPLICA | REPLICATED | RIGHT | ROLLUP | ROW\n"
+            + "    | ROWS | SAMPLE | SELECT | SEMI | SENDS | SET | SETTINGS | SHOW | SOURCE | START | STOP | SUBSTRING | SYNC | SYNTAX | SYSTEM | TABLE\n"
+            + "    | TABLES | TEMPORARY | TEST | THEN | TIES | TIMEOUT | TIMESTAMP | TOTALS | TRAILING | TRIM | TRUNCATE | TO | TOP | TTL | TYPE\n"
+            + "    | UNBOUNDED | UNION | UPDATE | USE | USING | UUID | VALUES | VIEW | VOLUME | WATCH | WHEN | WHERE | WINDOW | WITH";
+
+    Pattern pattern = Pattern.compile("[A-Z]+");
+    Matcher matcher = pattern.matcher(s);
+    List<String> list = new ArrayList<>();
+    while (matcher.find()) {
+      list.add(matcher.group());
+    }
+    System.out.println(Joiner.on("', '").appendTo(new StringBuilder("['"), list).append("']"));
+  }
+}
+```
+
+----------
+
+
+Please refine index.html for better UX and UI.

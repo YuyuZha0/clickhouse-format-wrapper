@@ -24,91 +24,62 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css"/>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/4.3.1/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/codemirror.min.css">
-    <!-- CodeMirror Themes -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/theme/eclipse.min.css">
     <link rel="stylesheet"
           href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/theme/material-darker.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/theme/eclipse.min.css">
     <style>
         /* --- CSS Variables for Theming --- */
         :root {
             --bg-color: #f8f9fa;
-            --bg-color-medium: #ffffff;
-            --bg-color-footer: #e9ecef;
             --text-color: #212529;
-            --text-color-muted: #6c757d;
             --heading-color: #343a40;
             --border-color: #dee2e6;
-            --shadow-color: rgba(0, 0, 0, 0.05);
-            --primary-color: #007bff;
+            --control-panel-bg: #ffffff;
+            --control-panel-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+            --editor-bg: #ffffff;
+            --editor-output-bg: #f1f3f5;
             --button-outline-color: #6c757d;
             --button-hover-bg: #e9ecef;
+            --tooltip-bg: #343a40;
+            --spinner-color: #17a2b8; /* Bootstrap .text-info */
         }
 
         [data-theme="dark"] {
             --bg-color: #1a1a1a;
-            --bg-color-medium: #2c2c2c;
-            --bg-color-footer: #252525;
             --text-color: #e0e0e0;
-            --text-color-muted: #adb5bd;
             --heading-color: #f8f9fa;
             --border-color: #444;
-            --shadow-color: rgba(0, 0, 0, 0.2);
-            --primary-color: #0d6efd;
+            --control-panel-bg: #2c2c2c;
+            --control-panel-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+            --editor-bg: #2c2c2c; /* Matches CodeMirror material-darker theme */
+            --editor-output-bg: #252525;
             --button-outline-color: #adb5bd;
             --button-hover-bg: #495057;
+            --tooltip-bg: #f8f9fa;
+            --spinner-color: #28a745; /* Bootstrap .text-success for better contrast */
         }
 
-        /* --- Layout --- */
-        html, body {
-            height: 100%;
-        }
-
+        /* --- General Body & Layout --- */
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
             background-color: var(--bg-color);
             color: var(--text-color);
-            display: flex;
-            flex-direction: column;
             transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out;
+            padding-top: 1rem;
         }
 
         .main-container {
-            flex: 1 0 auto;
-            padding: 1rem 1.5rem;
+            padding: 0 20px 20px;
         }
 
-        /* --- Header & Footer --- */
-        .page-header {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            border-bottom-color: var(--border-color) !important;
-        }
-
-        .page-header img {
-            width: 32px;
-            height: 32px;
-        }
-
-        .page-header h3 {
-            margin-bottom: 0;
+        h3 {
             color: var(--heading-color);
+            border-bottom: 1px solid var(--border-color);
         }
 
-        .footer {
-            flex-shrink: 0;
-            background-color: var(--bg-color-footer);
-            color: var(--text-color-muted);
-            font-size: 0.9rem;
-        }
-
-        .footer a {
-            color: var(--text-color);
-            text-decoration: none;
-        }
-
-        .footer a:hover {
-            color: var(--primary-color);
+        hr {
+            border-top: 1px solid var(--border-color);
+            margin: 1.5rem 0;
         }
 
         /* --- Control Panel --- */
@@ -117,143 +88,195 @@
             flex-wrap: wrap;
             align-items: center;
             gap: 0.5rem;
-            background-color: var(--bg-color-medium);
+            background-color: var(--control-panel-bg);
             padding: 0.75rem 1rem;
-            border-radius: 0.3rem;
-            box-shadow: 0 1px 3px var(--shadow-color);
+            border-radius: 0.375rem; /* Slightly more rounded */
+            box-shadow: var(--control-panel-shadow);
+            margin-bottom: 1rem;
             border: 1px solid var(--border-color);
-            margin-top: 1rem;
         }
 
-        .control-panel .btn-outline-secondary {
+        .control-panel .btn {
             color: var(--button-outline-color);
             border-color: var(--button-outline-color);
         }
 
-        .control-panel .btn-outline-secondary:hover {
+        .control-panel .btn:hover, .control-panel .btn:focus {
             background-color: var(--button-hover-bg);
+            color: var(--heading-color); /* Use a high-contrast text color on hover */
         }
 
-        /* --- Dropdown Menu --- */
+
+        /* Group related buttons with a separator */
+        .control-separator {
+            width: 1px;
+            height: 24px;
+            background-color: var(--border-color);
+            margin: 0 0.25rem;
+        }
+
+        /* Push theme toggle to the end */
+        .theme-toggle {
+            margin-left: auto;
+        }
+
+        /* --- Options Dropdown --- */
         .dropdown-menu {
             max-height: 450px;
             overflow-y: auto;
-            background-color: var(--bg-color-medium);
+            background-color: var(--control-panel-bg);
             border-color: var(--border-color);
         }
 
-        .dropdown-menu .dropdown-divider {
-            border-top-color: var(--border-color);
-        }
-
-        .dropdown-menu .form-check, .dropdown-menu .form-group {
-            margin-bottom: 0.75rem;
-        }
-
-        .dropdown-menu label {
-            font-size: 0.9em;
+        .dropdown-menu form {
             color: var(--text-color);
         }
 
-        .dropdown-menu .form-control {
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            border-color: var(--border-color);
-        }
-
-        .dropdown-menu .form-control:focus {
-            background-color: var(--bg-color);
-        }
-
-        /* --- Tooltip Flicker Fix --- */
-        .tooltip {
-            pointer-events: none;
-        }
-
-        /* --- Editors --- */
-        .editor-label {
-            font-size: 0.9rem;
-            font-weight: 500;
-            color: var(--text-color-muted);
+        .dropdown-menu form h6 {
+            color: #6c757d;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            font-weight: bold;
+            margin-top: 1rem;
             margin-bottom: 0.5rem;
+        }
+
+        .dropdown-menu form h6:first-of-type {
+            margin-top: 0;
+        }
+
+        .dropdown-menu .form-check-label, .dropdown-menu .form-group label {
+            font-size: 0.9em;
+        }
+
+        .dropdown-divider {
+            border-top: 1px solid var(--border-color);
+        }
+
+        /* --- SQL Editors (CodeMirror & Output) --- */
+        .editor-container {
+            position: relative;
+        }
+
+        .editor-label {
+            position: absolute;
+            top: -1.2rem;
+            left: 0.5rem;
+            font-size: 0.8rem;
+            color: #6c757d;
+            font-weight: 500;
         }
 
         .CodeMirror {
             border: 1px solid var(--border-color);
-            height: 65vh;
+            height: 70vh;
+            min-height: 300px;
             font-size: 0.95em;
-            border-radius: 0.3rem;
+            border-radius: 0.375rem;
+            background-color: var(--editor-bg) !important; /* Override theme styles */
         }
 
         #sqlOutput {
             border: 1px solid var(--border-color);
-            height: 65vh;
-            background-color: var(--bg-color-medium);
+            height: 70vh;
+            min-height: 300px;
+            background-color: var(--editor-output-bg);
             padding: 10px;
             font-family: Consolas, "Courier New", monospace;
             font-size: 0.95em;
-            overflow-y: auto;
-            border-radius: 0.3rem;
+            overflow: auto; /* Use 'auto' for better scrollbar behavior */
+            border-radius: 0.375rem;
             line-height: 1.5;
-            display: flex; /* For placeholder centering */
-            flex-direction: column;
+            white-space: pre; /* Use 'pre' for performance with ANSI output, relying on ansi_up for line breaks */
         }
 
-        #sqlOutput .placeholder-text {
-            color: var(--text-color-muted);
-            margin: auto;
-            text-align: center;
-        }
-
+        /* Cautious styling for ANSI output: Only set base color.
+           ansi_up.js will add its own spans for colors. */
         #sqlOutput code {
-            white-space: pre-wrap;
-            word-break: break-all;
+            color: var(--text-color);
         }
 
+        /* Error messages */
         #sqlOutput p.text-danger {
             margin: 0;
             font-weight: bold;
+            white-space: pre-wrap; /* Allow errors to wrap */
+        }
+
+        /* Center spinner vertically */
+        #sqlOutput .d-flex {
+            height: 100%;
+            align-items: center;
         }
 
         #sqlOutput .spinner-border {
-            color: var(--primary-color) !important;
+            color: var(--spinner-color);
+        }
+
+        /* --- Tooltips --- */
+        .tooltip-inner {
+            background-color: var(--tooltip-bg);
+            color: var(--bg-color); /* Invert text color for contrast */
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+            border: 1px solid var(--border-color);
+        }
+
+        .bs-tooltip-auto[x-placement^=bottom] .arrow::before, .bs-tooltip-bottom .arrow::before {
+            border-bottom-color: var(--tooltip-bg);
+        }
+
+        .bs-tooltip-auto[x-placement^=top] .arrow::before, .bs-tooltip-top .arrow::before {
+            border-top-color: var(--tooltip-bg);
+        }
+
+        .bs-tooltip-auto[x-placement^=right] .arrow::before, .bs-tooltip-right .arrow::before {
+            border-right-color: var(--tooltip-bg);
+        }
+
+        .bs-tooltip-auto[x-placement^=left] .arrow::before, .bs-tooltip-left .arrow::before {
+            border-left-color: var(--tooltip-bg);
         }
 
         /* --- Mobile Adjustments --- */
         @media (max-width: 767.98px) {
             .CodeMirror, #sqlOutput {
-                height: 40vh;
+                height: 45vh;
+                min-height: 250px;
             }
 
-            .main-container {
-                padding: 1rem;
+            .theme-toggle {
+                margin-left: 0;
             }
+        }
+
+        .tooltip {
+            pointer-events: none; /* This makes the tooltip invisible to the mouse, breaking the flicker loop */
         }
     </style>
 </head>
-<body data-theme="light">
+<body data-theme="light"> <!-- Default theme -->
 
 <div class="container-fluid main-container">
-    <header class="page-header pb-2 mb-2 border-bottom">
-        <img src="https://clickhouse.com/docs/img/docs_favicon.ico" alt="ClickHouse logo">
-        <h3>Online Clickhouse SQL Formatter</h3>
-    </header>
+    <h3 class="pb-2 mb-3">Online Clickhouse SQL Formatter</h3>
 
     <div class="row">
         <div class="col-12">
             <div class="control-panel">
-                <button class="btn btn-primary" type="button" id="formatBtn" data-toggle="tooltip"
+                <button class="btn btn-outline-secondary" type="button" id="formatBtn" data-toggle="tooltip"
                         data-placement="bottom" title="Format SQL (Ctrl+Enter)">
-                    <i class="fa fa-play" aria-hidden="true"></i> Format
+                    <i class="fa fa-play" aria-hidden="true"></i>
                 </button>
-                <button class="btn btn-outline-secondary" type="button" id="copyBtn" data-toggle="tooltip"
-                        data-placement="bottom" title="Copy to Clipboard">
+                <button class="btn btn-outline-secondary" type="button" id="copyBtn" data-clipboard-target="#sqlOutput"
+                        data-toggle="tooltip" data-placement="bottom" title="Copy to Clipboard">
                     <i class="fa fa-clipboard" aria-hidden="true"></i>
                 </button>
                 <button class="btn btn-outline-secondary" type="button" id="clearBtn" data-toggle="tooltip"
-                        data-placement="bottom" title="Clear Editors">
+                        data-placement="bottom" title="Clear Input">
                     <i class="fa fa-trash" aria-hidden="true"></i>
                 </button>
+
+                <div class="control-separator"></div>
+
                 <button class="btn btn-outline-secondary" type="button" id="undoBtn" data-toggle="tooltip"
                         data-placement="bottom" title="Undo (Ctrl+Z)">
                     <i class="fa fa-undo" aria-hidden="true"></i>
@@ -262,118 +285,132 @@
                         data-placement="bottom" title="Redo (Ctrl+Y)">
                     <i class="fa fa-repeat" aria-hidden="true"></i>
                 </button>
+
+                <div class="control-separator"></div>
+
                 <a href="https://clickhouse.com/docs/en/sql-reference" class="btn btn-outline-secondary" target="_blank"
                    rel="noopener" data-toggle="tooltip" data-placement="bottom" title="ClickHouse SQL Reference">
                     <i class="fa fa-book"></i>
                 </a>
 
-                <button class="btn btn-outline-secondary ml-auto" type="button" id="themeToggleBtn"
-                        data-toggle="tooltip" data-placement="bottom" title="Toggle Theme">
-                    <i class="fa fa-moon-o" aria-hidden="true"></i>
-                </button>
-
                 <div class="dropdown">
                     <button class="btn btn-outline-secondary dropdown-toggle" type="button" id="dropdownMenu2"
-                            data-toggle="dropdown" aria-haspopup="true" aria-expanded="false" data-toggle="tooltip"
-                            data-placement="bottom" title="Formatting Options">
+                            data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                         <i class="fa fa-cog" aria-hidden="true"></i>
                     </button>
                     <div class="dropdown-menu dropdown-menu-right" aria-labelledby="dropdownMenu2">
-                        <form class="px-3 py-2">
-                            <div class="form-check" data-toggle="tooltip" data-placement="left"
-                                 title="Enable auto format on text change">
+                        <!-- Replace the <form> inside your dropdown with this -->
+                        <form class="px-3 py-2" onsubmit="return false;">
+                            <h6>Formatting</h6>
+                            <div class="form-check">
                                 <input type="checkbox" class="form-check-input" id="autoFormatCheck">
-                                <label class="form-check-label" for="autoFormatCheck">Auto Format</label>
+                                <label class="form-check-label" for="autoFormatCheck" data-toggle="tooltip"
+                                       data-placement="right" title="Automatically format as you type">Auto
+                                    Format</label>
                             </div>
-                            <div class="dropdown-divider"></div>
-                            <div class="form-check" data-toggle="tooltip" data-placement="left"
-                                 title="Add syntax highlight with ANSI terminal escape sequences">
-                                <input type="checkbox" checked="checked" class="form-check-input" id="hiliteCheck">
-                                <label class="form-check-label" for="hiliteCheck">Highlight (ANSI)</label>
-                            </div>
-                            <div class="form-check" data-toggle="tooltip" data-placement="left"
-                                 title="Keep comments in the output">
+                            <div class="form-check">
                                 <input type="checkbox" checked="checked" class="form-check-input" id="commentsCheck">
-                                <label class="form-check-label" for="commentsCheck">Keep Comments</label>
+                                <label class="form-check-label" for="commentsCheck" data-toggle="tooltip"
+                                       data-placement="right" title="Keep comments in the output">Keep Comments</label>
                             </div>
-                            <div class="form-check" data-toggle="tooltip" data-placement="left"
-                                 title="Format in single line">
+                            <div class="form-check">
                                 <input type="checkbox" class="form-check-input" id="onelineCheck">
-                                <label class="form-check-label" for="onelineCheck">Single Line</label>
+                                <label class="form-check-label" for="onelineCheck" data-toggle="tooltip"
+                                       data-placement="right" title="Format query into a single line">Single
+                                    Line</label>
                             </div>
-                            <div class="form-check" data-toggle="tooltip" data-placement="left"
-                                 title="Allow multiple queries in the same file">
+                            <div class="form-check">
                                 <input type="checkbox" class="form-check-input" id="multiqueryCheck">
-                                <label class="form-check-label" for="multiqueryCheck">Allow Multi-query</label>
+                                <label class="form-check-label" for="multiqueryCheck" data-toggle="tooltip"
+                                       data-placement="right" title="Allow multiple queries separated by semicolons">Allow
+                                    Multi-query</label>
                             </div>
-                            <div class="form-check" data-toggle="tooltip" data-placement="left"
-                                 title="Add a backslash at the end of each line">
+                            <div class="form-check">
                                 <input type="checkbox" class="form-check-input" id="backslashCheck">
-                                <label class="form-check-label" for="backslashCheck">Add Backslashes</label>
+                                <label class="form-check-label" for="backslashCheck" data-toggle="tooltip"
+                                       data-placement="right" title="Add a backslash at the end of each line">Add
+                                    Backslashes</label>
                             </div>
-                            <div class="form-check" data-toggle="tooltip" data-placement="left"
-                                 title="Allow SETTINGS after FORMAT (not always safe)">
+
+                            <h6>Highlighting & Obfuscation</h6>
+                            <div class="form-check">
+                                <input type="checkbox" checked="checked" class="form-check-input" id="hiliteCheck">
+                                <label class="form-check-label" for="hiliteCheck" data-toggle="tooltip"
+                                       data-placement="right"
+                                       title="Use ANSI terminal escape sequences for syntax highlighting">Highlight
+                                    (ANSI)</label>
+                            </div>
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input" id="obfuscateCheck">
+                                <label class="form-check-label" for="obfuscateCheck" data-toggle="tooltip"
+                                       data-placement="right"
+                                       title="Obfuscate query instead of formatting">Obfuscate</label>
+                            </div>
+                            <div class="form-group mb-2">
+                                <label for="seedInput" data-toggle="tooltip" data-placement="right"
+                                       title="Seed for deterministic obfuscation">Obfuscation Seed:</label>
+                                <input type="text" class="form-control form-control-sm" id="seedInput">
+                            </div>
+
+                            <h6>Advanced</h6>
+                            <div class="form-check">
                                 <input type="checkbox" class="form-check-input"
                                        id="allowSettingsAfterFormatInInsertCheck">
-                                <label class="form-check-label" for="allowSettingsAfterFormatInInsertCheck">Allow
-                                    SETTINGS after FORMAT</label>
+                                <label class="form-check-label" for="allowSettingsAfterFormatInInsertCheck"
+                                       data-toggle="tooltip" data-placement="right"
+                                       title="Allow SETTINGS after FORMAT (not always safe)">Allow SETTINGS after
+                                    FORMAT</label>
                             </div>
-                            <div class="form-check" data-toggle="tooltip" data-placement="left"
-                                 title="Obfuscate instead of formatting">
-                                <input type="checkbox" class="form-check-input" id="obfuscateCheck">
-                                <label class="form-check-label" for="obfuscateCheck">Obfuscate</label>
-                            </div>
-                            <div class="dropdown-divider"></div>
-                            <div class="form-group" data-toggle="tooltip" data-placement="left"
-                                 title="Format in single line queries with length less than specified">
-                                <label for="maxLineLengthInput">Max Line Length:</label>
+                            <div class="form-group mb-2">
+                                <label for="maxLineLengthInput" data-toggle="tooltip" data-placement="right"
+                                       title="Max line length before wrapping">Max Line Length:</label>
                                 <input type="number" class="form-control form-control-sm" id="maxLineLengthInput"
                                        placeholder="120">
                             </div>
-                            <div class="form-group" data-toggle="tooltip" data-placement="left"
-                                 title="Seed that determines the result of obfuscation">
-                                <label for="seedInput">Obfuscation Seed:</label>
-                                <input type="text" class="form-control form-control-sm" id="seedInput">
-                            </div>
-                            <div class="form-group" data-toggle="tooltip" data-placement="left"
-                                 title="The maximum number of bytes of a query parsed by the SQL parser.">
-                                <label for="maxQuerySizeInput">Max Query Size (bytes):</label>
+                            <div class="form-group mb-2">
+                                <label for="maxQuerySizeInput" data-toggle="tooltip" data-placement="right"
+                                       title="Maximum bytes of a query parsed by the SQL parser.">Max Query Size
+                                    (bytes):</label>
                                 <input type="number" class="form-control form-control-sm" id="maxQuerySizeInput"
                                        placeholder="262144">
                             </div>
-                            <div class="form-group mb-0" data-toggle="tooltip" data-placement="left"
-                                 title="Maximum parser depth (recursion depth of recursive descend parser).">
-                                <label for="maxParserDepthInput">Max Parser Depth:</label>
+                            <div class="form-group mb-0">
+                                <label for="maxParserDepthInput" data-toggle="tooltip" data-placement="right"
+                                       title="Maximum parser recursion depth.">Max Parser Depth:</label>
                                 <input type="number" class="form-control form-control-sm" id="maxParserDepthInput"
                                        placeholder="1000">
                             </div>
                         </form>
                     </div>
                 </div>
+
+                <!-- Theme Toggle Button -->
+                <button class="btn btn-outline-secondary theme-toggle" type="button" id="themeToggleBtn"
+                        data-toggle="tooltip" data-placement="bottom" title="Toggle Theme">
+                    <i class="fa fa-moon-o" aria-hidden="true"></i>
+                </button>
             </div>
         </div>
     </div>
 
-    <div class="row sql-areas mt-3">
+    <!-- Separator is now just an hr with CSS styling -->
+    <hr>
+
+    <div class="row sql-areas">
         <div class="col-md-6 mb-3 mb-md-0">
-            <label class="editor-label" for="sqlInput">Source SQL</label>
-            <textarea id="sqlInput"></textarea>
+            <div class="editor-container">
+                <span class="editor-label">Input SQL</span>
+                <textarea id="sqlInput"></textarea>
+            </div>
         </div>
         <div class="col-md-6">
-            <label class="editor-label" for="sqlOutput">Formatted Output</label>
-            <div id="sqlOutput"></div>
+            <div class="editor-container">
+                <span class="editor-label">Formatted Output</span>
+                <div id="sqlOutput"></div>
+            </div>
         </div>
     </div>
 </div>
-
-<footer class="footer mt-auto py-3 text-center">
-    <div class="container">
-        <span>Powered by <a href="https://clickhouse.com/docs/en/operations/utilities/clickhouse-format" target="_blank"
-                            rel="noopener">clickhouse-format</a>.</span>
-        <span>View on <a href="https://github.com/YuyuZha0/clickhouse-format-wrapper" target="_blank"
-                         rel="noopener"><i class="fa fa-github"></i> GitHub</a>.</span>
-    </div>
-</footer>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.16.1/umd/popper.min.js"></script>
@@ -385,9 +422,10 @@
 
 <script type="text/javascript">
     $(function () {
+
         const initialTheme = localStorage.getItem('sqlFormatterTheme') || 'light';
         const editorThemes = {light: 'eclipse', dark: 'material-darker'};
-
+        // --- Initialize UI Elements ---
         const elements = {
             editor: CodeMirror.fromTextArea(document.getElementById("sqlInput"), {
                 lineNumbers: true,
@@ -401,7 +439,7 @@
                 styleActiveLine: true,
                 lineWrapping: true,
                 placeholder: "Paste your ClickHouse SQL here...",
-                extraKeys: {"Ctrl-Enter": formatRequest, "Cmd-Enter": formatRequest}
+                extraKeys: {"Ctrl-Enter": formatRequest}
             }),
             output: $('#sqlOutput'),
             hilite: $('#hiliteCheck'),
@@ -424,9 +462,7 @@
             themeToggleBtn: $('#themeToggleBtn')
         };
 
-        const outputPlaceholder = '<div class="placeholder-text">Formatted SQL will appear here</div>';
-        const highlighter = new AnsiUp();
-
+        // --- Core Formatting Logic ---
         const getOptions = function () {
             const obj = {
                 hilite: elements.hilite.prop('checked'),
@@ -441,19 +477,25 @@
                 maxParserDepth: elements.maxParserDepth.val(),
                 maxLineLength: elements.maxLineLength.val()
             };
+            // Clean up empty/false options before sending
             for (let key in obj) {
-                if (!obj[key]) {
+                const val = obj[key];
+                if (val === '' || val === null || val === undefined || val === false) {
                     delete obj[key];
                 }
             }
             return obj;
         };
 
+        // NOTE on ansi_up: It converts terminal color codes to HTML.
+        // CSS for #sqlOutput must be careful not to override the inline styles generated by this.
+        const highlighter = new AnsiUp();
+
         function formatRequest() {
             const sql = elements.editor.getValue().trim();
             if (!sql) return;
 
-            elements.output.html('<div class="d-flex justify-content-center align-items-center h-100"><div class="spinner-border" role="status"><span class="sr-only">Loading...</span></div></div>');
+            elements.output.html('<div class="d-flex justify-content-center"><div class="spinner-border" role="status"><span class="sr-only">Loading...</span></div></div>');
             const options = getOptions();
 
             $.ajax({
@@ -465,62 +507,83 @@
             }).done(function (data) {
                 gtag('event', 'format_success', {'inputLength': sql.length, 'outputLength': data.length});
                 if (options.hilite) {
+                    // IMPORTANT: Let ansi_up handle the HTML generation for colored output.
                     elements.output.html(highlighter.ansi_to_html(data));
                 } else {
-                    elements.output.html($('<code/>').text(data));
+                    // For non-highlighted, wrap in a <code> tag for semantic correctness and styling hooks.
+                    elements.output.html($('<code>').text(data));
                 }
-                elements.output.attr('data-clipboard-text', data);
-            }).fail(function (xhr) {
-                gtag('event', 'format_error', {'inputLength': sql.length, 'status': xhr.status});
-                elements.output.html(`<p class="text-danger">${xhr.responseText || 'An unknown error occurred.'}</p>`);
-                elements.output.removeAttr('data-clipboard-text');
+            }).fail(function (xhr, status, error) {
+                gtag('event', 'format_error', {'inputLength': sql.length, 'status': status, 'error': error});
+                elements.output.html($('<p>').addClass('text-danger').text(xhr.responseText));
             });
         }
 
+        // --- UX Enhancements & Event Handlers ---
+
+        // Auto-format with debounce
         let autoFormatTimer = null;
-        elements.editor.on('change', function () {
+        elements.editor.on('change', function (cm, change) {
             if (autoFormatTimer) clearTimeout(autoFormatTimer);
             if (elements.autoFormat.prop('checked')) {
                 autoFormatTimer = setTimeout(formatRequest, 350);
             }
+            // Disable clear button if editor is empty
+            const hasText = cm.getValue().length > 0;
+            elements.clearBtn.prop('disabled', !hasText);
         });
+
         elements.formatBtn.on('click', formatRequest);
 
-        const clipboard = new ClipboardJS('#copyBtn', {
-            text: trigger => $('#sqlOutput').attr('data-clipboard-text') || ''
-        });
-        clipboard.on('success', function (e) {
-            const trigger = $(e.trigger);
-            const originalTitle = trigger.attr('data-original-title');
-            trigger.attr('data-original-title', 'Copied!').tooltip('show');
-            setTimeout(() => trigger.tooltip('hide').attr('data-original-title', originalTitle), 2000);
-            e.clearSelection();
-        });
-
+        // Clear button
         elements.clearBtn.on('click', function () {
             elements.editor.setValue('');
-            elements.output.html(outputPlaceholder).removeAttr('data-clipboard-text');
+            elements.output.empty();
             elements.editor.focus();
         });
+
+        // Undo/Redo
         elements.undoBtn.on('click', () => elements.editor.undo());
         elements.redoBtn.on('click', () => elements.editor.redo());
 
-        // --- Final Corrected Tooltip & Dropdown Handling ---
-        // 1. Tooltips on the main bar. 'body' is a safe container.
-        $('.control-panel > [data-toggle="tooltip"]').tooltip({
+        // Copy button feedback
+        const clipboard = new ClipboardJS('#copyBtn');
+        clipboard.on('success', function (e) {
+            const originalIcon = 'fa-clipboard';
+            const successIcon = 'fa-check';
+            const $icon = $(e.trigger).find('.fa');
+
+            $icon.removeClass(originalIcon).addClass(successIcon);
+            $(e.trigger).tooltip('hide').attr('data-original-title', 'Copied!').tooltip('show');
+
+            setTimeout(function () {
+                $icon.removeClass(successIcon).addClass(originalIcon);
+                $(e.trigger).tooltip('hide').attr('data-original-title', 'Copy to Clipboard');
+            }, 2000);
+            e.clearSelection();
+        });
+
+        // Tooltips Initialization (with container to prevent clipping issues)
+        // 1. Initialize tooltips OUTSIDE the dropdown. These are simple and don't need special handling.
+        $('.control-panel > [data-toggle="tooltip"], .theme-toggle').tooltip({
+            delay: {"show": 300, "hide": 100}
+        });
+
+        // 2. Initialize tooltips INSIDE the dropdown menu with special options.
+        $('.dropdown-menu [data-toggle="tooltip"]').tooltip({
+            // Solves the clipping issue by moving the tooltip to the body.
             container: 'body',
+            // Solves the positioning issue that `container: 'body'` creates by
+            // ensuring the tooltip's position is calculated relative to the window.
+            boundary: 'window',
             delay: {"show": 300, "hide": 100}
         });
-        const dropdownMenu = $('.dropdown-menu');
-        // 2. Tooltips inside the dropdown. Use a local container for correct positioning.
-        dropdownMenu.tooltip({
-            selector: '[data-toggle="tooltip"]', // Use delegation within the dropdown
-            container: '.dropdown',
-            placement: 'left',
-            delay: {"show": 300, "hide": 100}
+
+
+        // 3. Keep the critical fix to stop the dropdown from closing when clicking inside it.
+        $('.dropdown-menu').on('click', (e) => {
+            e.stopPropagation();
         });
-        // 3. Critical fix: Stop clicks inside the dropdown from closing it.
-        dropdownMenu.on('click', (e) => e.stopPropagation());
 
         // --- Theme Toggling ---
         const themeIcon = {light: 'fa-moon-o', dark: 'fa-sun-o'};
@@ -528,18 +591,22 @@
         function applyTheme(theme) {
             $('body').attr('data-theme', theme);
             elements.themeToggleBtn.find('.fa').removeClass().addClass(`fa ${themeIcon[theme]}`);
-            elements.editor.setOption('theme', editorThemes[theme]);
             localStorage.setItem('sqlFormatterTheme', theme);
+            // ADD THIS LINE: This tells the editor to switch its theme.
+            elements.editor.setOption('theme', editorThemes[theme]);
         }
 
         elements.themeToggleBtn.on('click', function () {
-            const newTheme = $('body').attr('data-theme') === 'light' ? 'dark' : 'light';
+            const currentTheme = $('body').attr('data-theme');
+            const newTheme = currentTheme === 'light' ? 'dark' : 'light';
             applyTheme(newTheme);
         });
+
+        // Load saved theme on page load
         applyTheme(initialTheme);
 
-        // --- Initial State ---
-        elements.output.html(outputPlaceholder);
+        // Initial check for clear button state
+        elements.clearBtn.prop('disabled', elements.editor.getValue().length === 0);
     });
 </script>
 </body>
