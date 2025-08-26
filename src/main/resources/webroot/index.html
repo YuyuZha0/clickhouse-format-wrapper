@@ -26,6 +26,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/codemirror.min.css">
     <link rel="stylesheet"
           href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/theme/material-darker.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/theme/eclipse.min.css">
     <style>
         /* --- CSS Variables for Theming --- */
         :root {
@@ -172,10 +173,6 @@
             font-size: 0.95em;
             border-radius: 0.375rem;
             background-color: var(--editor-bg) !important; /* Override theme styles */
-        }
-
-        [data-theme="dark"] .CodeMirror {
-            background-color: #263238 !important; /* Match material-darker */
         }
 
         #sqlOutput {
@@ -418,12 +415,15 @@
 
 <script type="text/javascript">
     $(function () {
+
+        const initialTheme = localStorage.getItem('sqlFormatterTheme') || 'light';
+        const editorThemes = {light: 'eclipse', dark: 'material-darker'};
         // --- Initialize UI Elements ---
         const elements = {
             editor: CodeMirror.fromTextArea(document.getElementById("sqlInput"), {
                 lineNumbers: true,
                 mode: "text/x-sql",
-                theme: "material-darker",
+                theme: editorThemes[initialTheme],
                 matchBrackets: true,
                 smartIndent: true,
                 indentWithTabs: false,
@@ -571,6 +571,8 @@
             $('body').attr('data-theme', theme);
             elements.themeToggleBtn.find('.fa').removeClass().addClass(`fa ${themeIcon[theme]}`);
             localStorage.setItem('sqlFormatterTheme', theme);
+            // ADD THIS LINE: This tells the editor to switch its theme.
+            elements.editor.setOption('theme', editorThemes[theme]);
         }
 
         elements.themeToggleBtn.on('click', function () {
@@ -580,8 +582,7 @@
         });
 
         // Load saved theme on page load
-        const savedTheme = localStorage.getItem('sqlFormatterTheme') || 'light';
-        applyTheme(savedTheme);
+        applyTheme(initialTheme);
 
         // Initial check for clear button state
         elements.clearBtn.prop('disabled', elements.editor.getValue().length === 0);
