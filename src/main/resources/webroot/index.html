@@ -116,12 +116,13 @@
             font-family: Consolas, "Courier New", monospace;
             font-size: 0.95em;
             overflow-y: auto;
-            white-space: pre-wrap;
-            word-break: break-all;
             border-radius: 0.25rem;
             line-height: 1.4;
             display: flex;
             flex-direction: column;
+            /* === CORRECTED STYLES FOR LINE BREAKS === */
+            white-space: pre-wrap; /* Preserves newlines and wraps lines that are too long. */
+            overflow-wrap: break-word; /* Breaks words only if they would otherwise overflow. */
         }
 
         #sqlOutput .placeholder-text {
@@ -132,8 +133,7 @@
 
         #sqlOutput code {
             display: block;
-            white-space: pre-wrap;
-            word-break: break-all;
+            white-space: inherit; /* Inherit wrapping rules from parent */
             color: var(--text-color);
         }
 
@@ -313,7 +313,7 @@
     <div class="container">
         <span>Powered by <a href="https://clickhouse.com/docs/en/operations/utilities/clickhouse-format"
                             target="_blank">clickhouse-format</a>.</span>
-        <span>View on <a href="https://github.com/YuyuZha0/clickhouse-format-wrapper" target="_blank"><i
+        <span>View on <a href="https://github.com/ClickHouse/clickhouse-sql-formatter-web" target="_blank"><i
                 class="fa fa-github"></i> GitHub</a>.</span>
     </div>
 </footer>
