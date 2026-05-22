@@ -145,23 +145,20 @@
             z-index: 1;
             max-width: 1680px;
             margin: 0 auto;
-            padding: 36px 44px 44px;
+            padding: 20px 44px 28px;
         }
 
-        /* ===== Header ===== */
+        /* ===== Header (single-row app bar) ===== */
         .app-header {
-            display: grid;
-            gap: 28px;
-            padding-bottom: 32px;
-            margin-bottom: 32px;
+            padding-bottom: 14px;
+            margin-bottom: 18px;
             border-bottom: 1px solid var(--rule);
         }
 
-        .meta-row {
+        .header-bar {
             display: flex;
-            justify-content: space-between;
             align-items: center;
-            gap: 16px;
+            gap: 18px;
             flex-wrap: wrap;
             font-family: var(--font-mono);
             font-size: 11px;
@@ -193,111 +190,58 @@
             50%      { box-shadow: 0 0 0 5px rgba(250, 255, 105, 0.08); }
         }
 
-        .meta-divider {
-            color: var(--ink-muted);
-            opacity: 0.5;
-            margin: 0 4px;
-        }
-
-        .title-row {
-            display: grid;
-            grid-template-columns: 1fr auto;
-            gap: 48px;
-            align-items: end;
-        }
-
         .app-title {
             margin: 0;
             font-family: var(--font-display);
             font-weight: 400;
-            font-size: clamp(48px, 7.5vw, 104px);
-            line-height: 0.92;
-            letter-spacing: -0.025em;
+            font-size: clamp(20px, 2.2vw, 28px);
+            line-height: 1.1;
+            letter-spacing: -0.01em;
             color: var(--ink);
-            font-variation-settings: "opsz" 144;
+            text-transform: none;
+            font-variation-settings: "opsz" 24;
         }
 
-        .app-title .line-1 {
-            display: block;
-            font-style: normal;
-            font-weight: 400;
-        }
-
-        .app-title .line-2 {
+        .app-title em {
             display: inline-block;
             position: relative;
             font-style: italic;
             font-weight: 400;
-            padding: 0 0.08em;
-            margin-top: 0.04em;
-            font-variation-settings: "opsz" 144, "SOFT" 60, "WONK" 1;
+            padding: 0 0.12em;
+            font-variation-settings: "opsz" 24, "SOFT" 50, "WONK" 1;
         }
 
-        .app-title .line-2::before {
+        .app-title em::before {
             content: '';
             position: absolute;
-            left: -0.04em;
-            right: -0.04em;
-            top: 22%;
-            bottom: 12%;
+            left: 0;
+            right: 0;
+            top: 30%;
+            bottom: 8%;
             background: var(--accent);
             z-index: -1;
-            transform: skew(-7deg) rotate(-0.6deg);
+            transform: skew(-7deg) rotate(-0.4deg);
             border-radius: 2px;
         }
 
-        .app-title .punct {
-            font-style: italic;
-            color: var(--accent-2);
-            font-variation-settings: "opsz" 144;
-        }
-
-        [data-theme="dark"] .app-title .punct {
-            color: var(--accent);
-        }
-
-        .subtitle-block {
-            max-width: 340px;
-            text-align: right;
-            display: flex;
-            flex-direction: column;
-            gap: 14px;
-            padding-bottom: 0.5rem;
-        }
-
-        .subtitle-eyebrow {
-            font-family: var(--font-mono);
-            font-size: 10px;
-            letter-spacing: 0.16em;
-            text-transform: uppercase;
+        .header-attribution {
+            margin-left: auto;
             color: var(--ink-muted);
-            font-weight: 500;
-        }
-
-        .subtitle-text {
-            font-family: var(--font-sans);
-            font-size: 14px;
-            line-height: 1.55;
-            color: var(--ink-3);
-            margin: 0;
-        }
-
-        .subtitle-text em {
-            font-family: var(--font-display);
-            font-style: italic;
-            font-size: 17px;
-            font-weight: 400;
-            color: var(--ink);
-            letter-spacing: -0.005em;
-        }
-
-        .subtitle-text code {
             font-family: var(--font-mono);
-            font-size: 12px;
-            background: var(--bg-tint);
-            padding: 2px 6px;
+            font-size: 11px;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+        }
+
+        .header-attribution code {
+            font-family: var(--font-mono);
+            font-size: 11px;
             color: var(--ink-2);
-            border: 1px solid var(--rule);
+            background: none;
+            padding: 0;
+            border: 0;
+            letter-spacing: 0;
+            text-transform: lowercase;
         }
 
         /* ===== Control Panel ===== */
@@ -751,7 +695,7 @@
         /* CodeMirror & output styling */
         .CodeMirror {
             border: 0;
-            height: 64vh;
+            height: 75vh;
             min-height: 340px;
             font-family: var(--font-mono);
             font-size: 13px;
@@ -795,7 +739,7 @@
 
         #sqlOutput {
             border: 0;
-            height: 64vh;
+            height: 75vh;
             min-height: 340px;
             background-color: var(--surface);
             padding: 14px 18px;
@@ -949,17 +893,7 @@
         /* ===== Responsive ===== */
         @media (max-width: 980px) {
             .main-container {
-                padding: 28px 22px 36px;
-            }
-
-            .title-row {
-                grid-template-columns: 1fr;
-                gap: 24px;
-            }
-
-            .subtitle-block {
-                text-align: left;
-                max-width: 100%;
+                padding: 16px 22px 28px;
             }
 
             .editors-grid {
@@ -968,7 +902,7 @@
 
             .CodeMirror,
             #sqlOutput {
-                height: 48vh;
+                height: 60vh;
                 min-height: 280px;
             }
 
@@ -981,7 +915,7 @@
 
         @media (max-width: 560px) {
             .main-container {
-                padding: 22px 16px 28px;
+                padding: 14px 16px 24px;
             }
 
             .control-panel {
@@ -995,6 +929,10 @@
             #formatBtn {
                 padding: 0;
                 min-width: 46px;
+            }
+
+            .header-attribution {
+                display: none;
             }
 
             .app-footer {
@@ -1015,29 +953,12 @@
 <div class="main-container">
 
     <header class="app-header">
-        <div class="meta-row">
+        <div class="header-bar">
             <span class="meta-tag">System Ready</span>
-            <span>
-                <span>Online Tool</span>
-                <span class="meta-divider">·</span>
-                <span>Built on <code style="background:none;border:0;padding:0;color:inherit;font:inherit;">clickhouse-format</code></span>
-                <span class="meta-divider">·</span>
-                <span>v1.0</span>
+            <h1 class="app-title">ClickHouse SQL <em>Formatter</em></h1>
+            <span class="header-attribution">
+                Built on <code>clickhouse-format</code> &middot; v1.0
             </span>
-        </div>
-
-        <div class="title-row">
-            <h1 class="app-title">
-                <span class="line-1">ClickHouse SQL,</span>
-                <span class="line-2">Formatted<span class="punct">.</span></span>
-            </h1>
-            <div class="subtitle-block">
-                <span class="subtitle-eyebrow">— A Precision Instrument</span>
-                <p class="subtitle-text">
-                    Paste your analytical query and watch it become <em>legible</em>. Highlight, obfuscate, or
-                    compact — fully compatible with <code>clickhouse-format</code>.
-                </p>
-            </div>
         </div>
     </header>
 
