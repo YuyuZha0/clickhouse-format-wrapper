@@ -1,11 +1,12 @@
 package com.github.clickhouse.format;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.CaseFormat;
 import com.google.common.collect.ImmutableMap;
 import io.vertx.core.MultiMap;
+
+import java.io.Serial;
 import java.io.Serializable;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
@@ -13,7 +14,6 @@ import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import lombok.Getter;
 import lombok.NonNull;
@@ -46,9 +46,8 @@ import lombok.Setter;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public final class Options implements Serializable {
 
-  private static final Pattern ALLOWED_STRING_PATTERN = Pattern.compile("^[a-zA-Z0-9_\\-]+$");
-
   private static final Map<String, Field> CACHED_FIELDS;
+  @Serial
   private static final long serialVersionUID = -1793995872382083833L;
 
   static {
@@ -59,9 +58,6 @@ public final class Options implements Serializable {
       }
       field.setAccessible(true);
       fields.put(field.getName(), field);
-      if (field.isAnnotationPresent(JsonProperty.class)) {
-        fields.put(field.getAnnotation(JsonProperty.class).value(), field);
-      }
     }
     CACHED_FIELDS = ImmutableMap.copyOf(fields);
   }
@@ -105,16 +101,24 @@ public final class Options implements Serializable {
     return options;
   }
 
+  /**
+   * Normalize an argv value. {@link ProcessBuilder} delivers each list element directly to
+   * {@code execve} — no shell is involved — so spaces, {@code ;}, {@code &}, quotes, glob
+   * characters, etc. are all safe to pass through verbatim. The only genuine hazards at the
+   * argv boundary are null bytes (which truncate C strings) and other control characters
+   * (which corrupt anything that reads argv line-based). Reject those; pass everything else.
+   */
   private static String wrap(Object value) {
-    if (value instanceof String) {
-      String s = (String) value;
-      // avoid command line injection
-      if (ALLOWED_STRING_PATTERN.matcher(s).matches()) {
-        return s;
+    String s = value.toString();
+    for (int i = 0, n = s.length(); i < n; i++) {
+      char c = s.charAt(i);
+      if (Character.isISOControl(c)) {
+        throw new IllegalArgumentException(
+            String.format(
+                "argv value contains control character U+%04X at index %d", (int) c, i));
       }
-      return "";
     }
-    return value.toString();
+    return s;
   }
 
   public <T extends Collection<String>> T appendTo(@NonNull T command) {

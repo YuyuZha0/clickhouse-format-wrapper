@@ -1,5 +1,6 @@
-FROM openjdk:8
+FROM eclipse-temurin:21-jre
 
+RUN apt-get update
 RUN apt-get install -y apt-transport-https ca-certificates curl gnupg
 RUN curl -fsSL 'https://packages.clickhouse.com/rpm/lts/repodata/repomd.xml.key' | gpg --dearmor -o /usr/share/keyrings/clickhouse-keyring.gpg  \
     && echo "deb [signed-by=/usr/share/keyrings/clickhouse-keyring.gpg] https://packages.clickhouse.com/deb stable main" | tee \
@@ -9,4 +10,4 @@ RUN apt-get install -y clickhouse-client
 
 WORKDIR /usr/local/app
 COPY target/clickhouse-format-wrapper-1.0-SNAPSHOT.jar .
-CMD ["java","-Xmx256m", "-jar", "clickhouse-format-wrapper-1.0-SNAPSHOT.jar"]
+CMD ["java", "-Xmx256m", "-XX:+UseG1GC", "-XX:+UseContainerSupport", "--add-opens", "java.base/java.lang=ALL-UNNAMED", "-jar", "clickhouse-format-wrapper-1.0-SNAPSHOT.jar"]
